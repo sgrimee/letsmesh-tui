@@ -15,30 +15,12 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
-from lma.api import DEFAULT_REGION, fetch_packets
-from lma.db import learn_from_advert, load_db, save_db
+from lma.letsmesh_api import DEFAULT_REGION, fetch_packets
+from lma.db import learn_from_advert, load_db, resolve_name, save_db
 from lma.decoder import decode_packet
+from lma.map_view import PacketMapScreen
 
 MAX_PACKETS = 500
-
-
-def resolve_name(origin_id: str, db: dict) -> str:
-    """Resolve a key prefix to a display name.
-
-    Returns the node name if unambiguous, 'name1/name2?' if multiple matches,
-    or the raw 8-char prefix if no match found.
-    """
-    origin_id = origin_id.lower()
-    names = [
-        db["nodes"][key]["name"]
-        for key in db.get("nodes", {})
-        if key.startswith(origin_id) or origin_id.startswith(key[: len(origin_id)])
-    ]
-    if not names:
-        return origin_id[:8]
-    if len(names) == 1:
-        return names[0]
-    return "/".join(names) + "?"
 
 
 def decode_path_from_raw(raw_data: str) -> list[str] | None:
@@ -356,6 +338,7 @@ class PacketDetailScreen(ModalScreen):
         Binding("escape,q", "dismiss", "Close"),
         Binding("up,k", "prev", "Previous"),
         Binding("down,j", "next", "Next"),
+        Binding("m", "open_map", "Map"),
     ]
 
     def __init__(self, packets: list[dict], index: int, db: dict):
@@ -373,7 +356,7 @@ class PacketDetailScreen(ModalScreen):
     def _refresh_content(self) -> None:
         p = self._packets[self._index]
         n = len(self._packets)
-        header = f"[dim]({self._index + 1}/{n}  ↑↓ navigate)[/dim]\n"
+        header = f"[dim]({self._index + 1}/{n}  ↑↓ navigate  m map)[/dim]\n"
         self.query_one("#content", Static).update(
             header + _build_detail_text(p, self._db)
         )
@@ -390,6 +373,9 @@ class PacketDetailScreen(ModalScreen):
             self._index += 1
             self._refresh_content()
 
+    def action_open_map(self) -> None:
+        self.app.push_screen(PacketMapScreen(self._packets, self._index, self._db))
+
 
 class PacketMonitorApp(App):
     """Live MeshCore packet monitor."""
@@ -400,6 +386,7 @@ class PacketMonitorApp(App):
         Binding("r", "refresh", "Refresh"),
         Binding("p", "pause", "Pause/Resume"),
         Binding("f", "filter", "Filter"),
+        Binding("m", "open_map", "Map"),
         Binding("n", "toggle_names", "Names"),
         Binding("w", "toggle_wrap", "Wrap"),
         Binding("c", "clear", "Clear"),
@@ -559,6 +546,12 @@ class PacketMonitorApp(App):
         if not self._displayed:
             return
         self.push_screen(PacketDetailScreen(self._displayed, event.cursor_row, self._db))
+
+    def action_open_map(self) -> None:
+        if not self._displayed:
+            return
+        row = self.query_one("#packets", DataTable).cursor_row
+        self.push_screen(PacketMapScreen(self._displayed, row, self._db))
 
     def action_toggle_names(self) -> None:
         self._resolve_path = (self._resolve_path - 1) % 3

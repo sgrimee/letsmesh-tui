@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from lma.api import DEFAULT_REGION
+from lma.letsmesh_api import DEFAULT_REGION
 
 
 def main() -> None:

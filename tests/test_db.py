@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lma.db import load_db, parse_input_file, save_db, update
+from lma.db import learn_from_advert, load_db, parse_input_file, resolve_name, save_db, update
 
 
 INPUT_CONTENT = """\
@@ -115,3 +115,74 @@ def test_update_api_failure_continues(tmp_path):
 
     db = json.loads(db_file.read_text())
     assert "aabbccdd" in db["nodes"]
+
+
+# --- resolve_name ---
+
+def test_resolve_name_exact():
+    db = {"nodes": {"aabbccdd": {"name": "my-node"}}}
+    assert resolve_name("aabbccdd", db) == "my-node"
+
+
+def test_resolve_name_prefix():
+    db = {"nodes": {"aabbccdd11223344": {"name": "my-node"}}}
+    assert resolve_name("aabbccdd", db) == "my-node"
+
+
+def test_resolve_name_not_found():
+    db = {"nodes": {"aabbccdd": {"name": "my-node"}}}
+    assert resolve_name("deadbeef", db) == "deadbeef"
+
+
+def test_resolve_name_ambiguous():
+    db = {"nodes": {"aabb1111": {"name": "node-a"}, "aabb2222": {"name": "node-b"}}}
+    result = resolve_name("aabb", db)
+    assert result.endswith("?")
+    assert "node-a" in result
+    assert "node-b" in result
+
+
+# --- learn_from_advert ---
+
+def test_learn_from_advert_new_node():
+    db = {"nodes": {}}
+    key = "a" * 64
+    changed = learn_from_advert(db, key, "my-node", "ChatNode")
+    assert changed is True
+    assert db["nodes"][key]["name"] == "my-node"
+    assert db["nodes"][key]["type"] == "CLI"
+    assert db["nodes"][key]["source"] == "advert"
+    assert db["nodes"][key]["key_complete"] is True
+
+
+def test_learn_from_advert_with_coords():
+    db = {"nodes": {}}
+    key = "b" * 64
+    changed = learn_from_advert(db, key, "gw", "Repeater", lat=49.5, lon=6.2)
+    assert changed is True
+    assert db["nodes"][key]["lat"] == 49.5
+    assert db["nodes"][key]["lon"] == 6.2
+
+
+def test_learn_from_advert_no_change():
+    db = {"nodes": {}}
+    key = "c" * 64
+    learn_from_advert(db, key, "gw", "ChatNode", lat=1.0, lon=2.0)
+    changed = learn_from_advert(db, key, "gw", "ChatNode", lat=1.0, lon=2.0)
+    assert changed is False
+
+
+def test_learn_from_advert_skips_handcurated():
+    db = {"nodes": {}}
+    key = "d" * 64
+    db["nodes"][key] = {"name": "curated", "type": "REP", "source": "nodes.txt"}
+    changed = learn_from_advert(db, key, "new-name", "ChatNode")
+    assert changed is False
+    assert db["nodes"][key]["name"] == "curated"
+
+
+def test_learn_from_advert_invalid_key():
+    db = {"nodes": {}}
+    changed = learn_from_advert(db, "tooshort", "x", "ChatNode")
+    assert changed is False
+    assert db["nodes"] == {}

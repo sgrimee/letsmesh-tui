@@ -4,7 +4,8 @@ import json
 import re
 from pathlib import Path
 
-from lma.api import DEFAULT_REGION, fetch_nodes
+from lma.letsmesh_api import DEFAULT_REGION, fetch_nodes
+from lma.meshcore_api import fetch_node_coords
 
 _ADVERT_ROLE_SHORT = {
     "ChatNode": "CLI", "Repeater": "REP", "RoomServer": "RMS", "Sensor": "CLT",
@@ -90,6 +91,25 @@ def parse_input_file(path) -> dict[str, dict]:
     return nodes
 
 
+def resolve_name(origin_id: str, db: dict) -> str:
+    """Resolve a key prefix to a display name.
+
+    Returns the node name if unambiguous, 'name1/name2?' if multiple matches,
+    or the raw 8-char prefix if no match found.
+    """
+    origin_id = origin_id.lower()
+    names = [
+        db["nodes"][key]["name"]
+        for key in db.get("nodes", {})
+        if key.startswith(origin_id) or origin_id.startswith(key[: len(origin_id)])
+    ]
+    if not names:
+        return origin_id[:8]
+    if len(names) == 1:
+        return names[0]
+    return "/".join(names) + "?"
+
+
 def update(region: str = DEFAULT_REGION) -> None:
     # Seed with advert-learned nodes so they survive if not in API/input files
     existing = load_db()
@@ -123,6 +143,20 @@ def update(region: str = DEFAULT_REGION) -> None:
 
     except Exception as e:
         print(f"  Warning: API fetch failed: {e}")
+
+    print("Fetching coordinates from map.meshcore.dev...")
+    try:
+        coords = fetch_node_coords()
+        print(f"  {len(coords)} nodes with coordinates")
+        filled = 0
+        for key, node in db["nodes"].items():
+            if "lat" not in node and key in coords:
+                node["lat"] = coords[key]["lat"]
+                node["lon"] = coords[key]["lon"]
+                filled += 1
+        print(f"  {filled} nodes backfilled with coordinates")
+    except Exception as e:
+        print(f"  Warning: meshcore.dev coord fetch failed: {e}")
 
     save_db(db)
     print(f"Database updated: {len(db['nodes'])} total nodes -> {DB_FILE}")
