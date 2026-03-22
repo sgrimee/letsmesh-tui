@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 
+from rich.markup import escape as markup_escape
+
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -112,40 +114,68 @@ def _build_detail_text(packet: dict, db: dict) -> str:
     return "\n".join(lines)
 
 
-class FilterScreen(ModalScreen[str]):
-    """Modal dialog for filtering by node name."""
+class FilterScreen(ModalScreen[dict]):
+    """Modal dialog for filtering packets by multiple criteria."""
 
     DEFAULT_CSS = """
     FilterScreen {
         align: center middle;
     }
-    FilterScreen > Label {
-        width: 44;
+    FilterScreen > Static {
+        width: 54;
         padding: 1 2 0 2;
         background: $surface;
     }
+    FilterScreen > #title {
+        padding: 1 2 0 2;
+        background: $surface;
+        text-style: bold;
+    }
+    FilterScreen > #hint {
+        padding: 0 2 1 2;
+        background: $surface;
+        color: $text-muted;
+        text-style: italic;
+    }
     FilterScreen > Input {
-        width: 44;
+        width: 54;
         border: solid $accent;
         background: $surface;
         padding: 0 1;
-        margin-bottom: 1;
     }
     """
 
+    BINDINGS = [Binding("escape", "clear_all", "Clear all")]
+
+    def __init__(self, filters: dict):
+        super().__init__()
+        self._pkt_filters = filters
+
     def compose(self) -> ComposeResult:
-        yield Label("Filter by node name (empty = show all):")
-        yield Input(placeholder="node name...")
+        yield Static("Packet Filters  (name or hex address)", id="title", markup=False)
+        yield Static("Observer:", markup=False)
+        yield Input(value=self._pkt_filters.get("observer", ""), placeholder="e.g.  gw-home  or  ab cd ef", id="observer")
+        yield Static("Any node (observer or in path):", markup=False)
+        yield Input(value=self._pkt_filters.get("node", ""), placeholder="e.g.  relay  or  ab cd", id="node")
+        yield Static("Node in path:", markup=False)
+        yield Input(value=self._pkt_filters.get("path_node", ""), placeholder="e.g.  relay  or  ab cd", id="path_node")
+        yield Static("↵ apply · Esc clear all · Tab next field", id="hint", markup=False)
 
     def on_mount(self) -> None:
-        self.query_one(Input).focus()
+        self.query_one("#observer", Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip())
+        self._apply()
 
-    def on_key(self, event) -> None:
-        if event.key == "escape":
-            self.dismiss("")
+    def _apply(self) -> None:
+        self.dismiss({
+            "observer": self.query_one("#observer", Input).value.strip(),
+            "node": self.query_one("#node", Input).value.strip(),
+            "path_node": self.query_one("#path_node", Input).value.strip(),
+        })
+
+    def action_clear_all(self) -> None:
+        self.dismiss({"observer": "", "node": "", "path_node": ""})
 
 
 class PacketDetailScreen(ModalScreen):
@@ -235,7 +265,7 @@ class PacketMonitorApp(App):
         self._db: dict = {"nodes": {}}
         self._seen_ids: set[str] = set()
         self._paused = False
-        self._filter = ""
+        self._pkt_filters: dict = {"observer": "", "node": "", "path_node": ""}
         self._all_packets: list[dict] = []
         self._packets_by_id: dict[str, dict] = {}
         self._displayed: list[dict] = []
@@ -250,7 +280,7 @@ class PacketMonitorApp(App):
     def on_mount(self) -> None:
         self._db = load_db()
         table = self.query_one("#packets", DataTable)
-        table.add_columns("Time", "Node", "Type", "SNR", "RSSI", "Path")
+        table.add_columns("Time", "Observer", "Type", "SNR", "RSSI", "Path")
         table.cursor_type = "row"
         self.sub_title = f"region={self.region}  poll={self.poll_interval}s"
         self._set_status(None)
@@ -290,14 +320,33 @@ class PacketMonitorApp(App):
             self._rebuild_table()
         self._set_status(None)
 
+    def _node_matches(self, term: str, node_id: str) -> bool:
+        """True if term matches the node by name substring or hex address prefix."""
+        t = term.lower().replace(" ", "")
+        return t in resolve_name(node_id, self._db).lower() or node_id.lower().startswith(t)
+
+    def _packet_matches(self, p: dict) -> bool:
+        f = self._pkt_filters
+        obs_id = p.get("origin_id", "")
+        path_ids = p.get("path") or []
+
+        if f["observer"] and not self._node_matches(f["observer"], obs_id):
+            return False
+
+        if f["node"]:
+            all_ids = [obs_id] + list(path_ids)
+            if not any(self._node_matches(f["node"], nid) for nid in all_ids):
+                return False
+
+        if f["path_node"] and not any(self._node_matches(f["path_node"], nid) for nid in path_ids):
+            return False
+
+        return True
+
     def _rebuild_table(self) -> None:
         table = self.query_one("#packets", DataTable)
         table.clear()
-        self._displayed = [
-            p for p in self._all_packets
-            if not self._filter
-            or self._filter.lower() in resolve_name(p.get("origin_id", ""), self._db).lower()
-        ]
+        self._displayed = [p for p in self._all_packets if self._packet_matches(p)]
         for p in self._displayed:
             heard = p.get("heard_at", "")
             try:
@@ -324,7 +373,11 @@ class PacketMonitorApp(App):
 
     def _set_status(self, error: str | None) -> None:
         state = "[PAUSED]" if self._paused else "[LIVE]"
-        filt = f"  filter: {self._filter}" if self._filter else ""
+        parts = []
+        if self._pkt_filters["observer"]: parts.append(f"obs={markup_escape(self._pkt_filters['observer'])}")
+        if self._pkt_filters["node"]: parts.append(f"node={markup_escape(self._pkt_filters['node'])}")
+        if self._pkt_filters["path_node"]: parts.append(f"path={markup_escape(self._pkt_filters['path_node'])}")
+        filt = f"  ({', '.join(parts)})" if parts else ""
         names = "  path:names" if self._resolve_path else "  path:hops"
         count = len(self._all_packets)
         now = datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
@@ -344,12 +397,13 @@ class PacketMonitorApp(App):
         self._set_status(None)
 
     def action_filter(self) -> None:
-        def apply_filter(value: str) -> None:
-            self._filter = value or ""
+        def apply_filter(value: dict | None) -> None:
+            if value is not None:
+                self._pkt_filters = value
             self._rebuild_table()
             self._set_status(None)
 
-        self.push_screen(FilterScreen(), apply_filter)
+        self.push_screen(FilterScreen(self._pkt_filters), apply_filter)
 
 
 def run_monitor(region: str = DEFAULT_REGION, poll_interval: int = 5) -> None:
