@@ -91,7 +91,11 @@ def parse_input_file(path) -> dict[str, dict]:
 
 
 def update(region: str = DEFAULT_REGION) -> None:
-    db: dict = {"nodes": {}}
+    # Seed with advert-learned nodes so they survive if not in API/input files
+    existing = load_db()
+    advert_nodes = {k: v for k, v in existing["nodes"].items()
+                    if v.get("source") == "advert"}
+    db: dict = {"nodes": dict(advert_nodes)}
 
     for f in sorted(INPUT_DIR.glob("*.txt")):
         print(f"Parsing {f.name}...")
