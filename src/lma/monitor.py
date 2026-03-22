@@ -484,7 +484,9 @@ class PacketMonitorApp(App):
                 pub = decoded_payload["public_key"]
                 name = decoded_payload.get("name") or pub[:8]
                 role = decoded_payload.get("role", "")
-                if learn_from_advert(self._db, pub, name, role):
+                lat = decoded_payload.get("lat")
+                lon = decoded_payload.get("lon")
+                if learn_from_advert(self._db, pub, name, role, lat, lon):
                     db_dirty = True
                 p["_src_hash"] = pub[:12]
             self._packets_by_id[p["id"]] = p
