@@ -1,0 +1,3 @@
+my-node                          CLI   1a2b3c4d5e6f  Flood
+neighbor-repeater                REP   7f8e9d0c1b2a  0 hop
+friend-device                    CLI   deadbeef1234  Flood

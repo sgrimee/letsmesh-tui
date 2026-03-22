@@ -1,2 +1,7 @@
 nodes.json
-input/
+input/*
+!input/example.txt.sample
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

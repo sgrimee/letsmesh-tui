@@ -1,6 +1,16 @@
 # meshcore-nodes
 
-A CLI tool to maintain a database of MeshCore node public keys and look up node names by key prefix.
+An unofficial CLI client for the [letsmesh analyzer](https://analyzer.letsmesh.net) — maintains a local database of MeshCore node public keys and lets you look up node names by key prefix.
+
+## Screenshots
+
+**Live packet monitor** — resolves relay hops to node names, shows SNR/RSSI, and highlights selected packets
+
+![Packet monitor with named relay path](assets/packets%20with%20name%20and%20hex%20path.png)
+
+| Packet detail | Map view |
+|---|---|
+| ![Packet detail panel](assets/packet%20detail.png) | ![Map view](assets/map.png) |
 
 ## Usage
 
@@ -37,7 +47,7 @@ lma monitor
 
 ### Input files (`input/*.txt`)
 
-Static node lists maintained manually. Format (one node per line):
+Static node lists maintained manually. The easiest way to populate one is to copy-paste the output of `list contacts` from [meshcore-cli](https://github.com/ripplingwaves/meshcore-cli). Format (one node per line):
 
 ```
 name   TYPE   pubkey_hex   [routing]
@@ -49,6 +59,8 @@ name   TYPE   pubkey_hex   [routing]
 - `routing` — optional, e.g. `Flood` or `0 hop`
 
 Lines may optionally be prefixed with a line number (`1→`).
+
+See `input/example.txt.sample` for a sample. Copy it to a new `.txt` file in the same directory and edit it with your own nodes.
 
 ### Live APIs
 
@@ -76,3 +88,9 @@ Or install as a tool:
 uv tool install --all-extras .
 lma nodes update
 ```
+
+## Credits
+
+- [letsmesh analyzer](https://analyzer.letsmesh.net) — packet analysis and node list API (`api.letsmesh.net`)
+- [MeshCore](https://meshcore.dev) — firmware and node map API (`map.meshcore.dev`)
+- [meshcore-cli](https://github.com/ripplingwaves/meshcore-cli) — CLI for interacting with MeshCore nodes
