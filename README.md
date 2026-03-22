@@ -5,28 +5,32 @@ A CLI tool to maintain a database of MeshCore node public keys and look up node 
 ## Usage
 
 ```
-nodes update [--region REGION]   update database from input files and live API
-nodes lookup <hex_prefix>        find node(s) by key prefix (1+ hex chars)
-nodes list [--by-key]            list all nodes (default: sort by name)
+lma nodes update [--region REGION]   update database from input files and APIs
+lma nodes lookup <hex_prefix>        find node(s) by key prefix (1+ hex chars)
+lma nodes list [--by-key]            list all nodes (default: sort by name)
+lma monitor [--region REGION] [--poll SECONDS]   live packet monitoring TUI
 ```
 
 ### Examples
 
 ```sh
 # Rebuild the database
-nodes update
+lma nodes update
 
 # Look up by first byte of public key
-nodes lookup 7d
+lma nodes lookup 7d
 
 # Look up by two bytes
-nodes lookup ab4b
+lma nodes lookup ab4b
 
 # List all nodes sorted alphabetically
-nodes list
+lma nodes list
 
 # List all nodes sorted by public key
-nodes list --by-key
+lma nodes list --by-key
+
+# Start live packet monitor
+lma monitor
 ```
 
 ## Data sources
@@ -46,12 +50,12 @@ name   TYPE   pubkey_hex   [routing]
 
 Lines may optionally be prefixed with a line number (`1→`).
 
-### Live API
+### Live APIs
 
-On `nodes update`, the tool fetches node data from `https://api.letsmesh.net/api/nodes`.
-Use `--region` to fetch a different region (default: `LUX`).
+On `lma nodes update`, the tool fetches data from two sources:
 
-Partial keys from input files are automatically matched and upgraded to full 32-byte keys when the API returns a matching node.
+- **letsmesh** (`api.letsmesh.net`) — node list for the region; partial keys from input files are matched and upgraded to full 64-char keys. Use `--region` to select a region (default: `LUX`).
+- **map.meshcore.dev** — node coordinates (lat/lon); backfills any node in the database that lacks coordinates.
 
 ## Database
 
@@ -62,13 +66,13 @@ The database is stored in `nodes.json` (gitignored, auto-generated). Run `nodes 
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```sh
-uv sync
-uv run nodes update
+uv sync --all-extras
+uv run lma nodes update
 ```
 
 Or install as a tool:
 
 ```sh
-uv tool install .
-nodes update
+uv tool install --all-extras .
+lma nodes update
 ```
