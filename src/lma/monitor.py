@@ -40,7 +40,15 @@ def resolve_name(origin_id: str, db: dict) -> str:
     return "/".join(names) + "?"
 
 
+def get_source(path_list: list, db: dict, resolve: bool = True) -> str:
+    """Return the source node (first path element)."""
+    if not path_list:
+        return "?"
+    return resolve_name(path_list[0], db) if resolve else path_list[0]
+
+
 def format_path(path_list: list, db: dict, resolve: bool = True) -> str:
+    """Format full path: source → relay1 → relay2 → ..."""
     if not path_list:
         return "direct"
     if not resolve:
@@ -68,12 +76,13 @@ def fmt_ts(iso: str) -> str:
 
 def _build_detail_text(packet: dict, db: dict) -> str:
     p = packet
-    node_name = resolve_name(p.get("origin_id", ""), db)
+    observer_name = p.get("origin") or resolve_name(p.get("origin_id", ""), db)
     lines = [
         "[bold]Packet detail[/bold]",
         "",
-        f"[dim]Node:[/dim]       {node_name}",
+        f"[dim]Observer:[/dim]   {observer_name}",
         f"[dim]Origin ID:[/dim]  {p.get('origin_id', '-')}",
+        *([ f"[dim]Source:[/dim]    {p['node_name']}" ] if p.get("node_name") else []),
         f"[dim]Heard at:[/dim]   {fmt_ts(p.get('heard_at', ''))}",
         f"[dim]Type:[/dim]       {p.get('payload_type', '-')}",
         f"[dim]Route:[/dim]      {p.get('route_type', '-')}",
@@ -83,14 +92,21 @@ def _build_detail_text(packet: dict, db: dict) -> str:
         "",
     ]
 
-    path = p.get("path") or []
-    if not path:
-        lines.append("[dim]Path:[/dim]       direct")
+    full_path = p.get("path") or []
+    if not full_path:
+        lines.append("[dim]Source:[/dim]     (unknown — direct to observer)")
+        lines.append("[dim]Relays:[/dim]     none")
     else:
-        lines.append("[dim]Path:[/dim]")
-        for hop in path:
-            name = resolve_name(hop, db)
-            lines.append(f"  [dim]{fmt_key_prefix(hop)}[/dim]  {name}")
+        src = full_path[0]
+        lines.append(f"[dim]Source:[/dim]     [dim]{fmt_key_prefix(src)}[/dim]  {resolve_name(src, db)}")
+        relays = full_path[1:]
+        if not relays:
+            lines.append("[dim]Relays:[/dim]     none")
+        else:
+            lines.append("[dim]Relays:[/dim]")
+            for hop in relays:
+                name = resolve_name(hop, db)
+                lines.append(f"  [dim]{fmt_key_prefix(hop)}[/dim]  {name}")
 
     decoded = p.get("decoded_payload")
     if decoded:
@@ -156,9 +172,9 @@ class FilterScreen(ModalScreen[dict]):
         yield Static("Packet Filters  (name or hex address)", id="title", markup=False)
         yield Static("Observer:", markup=False)
         yield Input(value=self._pkt_filters.get("observer", ""), placeholder="e.g.  gw-home  or  ab cd ef", id="observer")
-        yield Static("Any node (observer or in path):", markup=False)
+        yield Static("Any node (observer, source or relay):", markup=False)
         yield Input(value=self._pkt_filters.get("node", ""), placeholder="e.g.  relay  or  ab cd", id="node")
-        yield Static("Node in path:", markup=False)
+        yield Static("Relay node (in path):", markup=False)
         yield Input(value=self._pkt_filters.get("path_node", ""), placeholder="e.g.  relay  or  ab cd", id="path_node")
         yield Static("↵ apply · Esc clear all · Tab next field", id="hint", markup=False)
 
@@ -247,6 +263,7 @@ class PacketMonitorApp(App):
         Binding("f", "filter", "Filter"),
         Binding("n", "toggle_names", "Names"),
         Binding("w", "toggle_wrap", "Wrap"),
+        Binding("c", "clear", "Clear"),
     ]
     CSS = """
     DataTable {
@@ -283,7 +300,7 @@ class PacketMonitorApp(App):
     def on_mount(self) -> None:
         self._db = load_db()
         table = self.query_one("#packets", DataTable)
-        table.add_columns("Time", "Observer", "Type", "SNR", "RSSI", "Path")
+        table.add_columns("Time", "Observer", "Type", "SNR", "RSSI", "Src→Relays")
         table.cursor_type = "row"
         self.sub_title = f"region={self.region}  poll={self.poll_interval}s"
         self._set_status(None)
@@ -333,8 +350,11 @@ class PacketMonitorApp(App):
         obs_id = p.get("origin_id", "")
         path_ids = p.get("path") or []
 
-        if f["observer"] and not self._node_matches(f["observer"], obs_id):
-            return False
+        if f["observer"]:
+            t = f["observer"].lower()
+            origin_name = (p.get("origin") or "").lower()
+            if t not in origin_name and not self._node_matches(f["observer"], obs_id):
+                return False
 
         if f["node"]:
             all_ids = [obs_id] + list(path_ids)
@@ -357,11 +377,12 @@ class PacketMonitorApp(App):
                 time_str = dt.astimezone().strftime("%H:%M:%S")
             except Exception:
                 time_str = heard[:8]
-            node = resolve_name(p.get("origin_id", ""), self._db)
+            node = p.get("origin") or resolve_name(p.get("origin_id", ""), self._db)
             ptype = format_payload_type(p.get("payload_type", ""))
             snr = f"{p['snr']:.1f}" if p.get("snr") is not None else "-"
             rssi = str(p.get("rssi", "-"))
-            path = format_path(p.get("path") or [], self._db, resolve=self._resolve_path)
+            raw_path = p.get("path") or []
+            path = format_path(raw_path, self._db, resolve=self._resolve_path)
             if self._wrap_path:
                 wrap_width = max(20, self.size.width - 58)
                 lines = textwrap.wrap(path, width=wrap_width) or [path]
@@ -385,6 +406,14 @@ class PacketMonitorApp(App):
     def action_toggle_wrap(self) -> None:
         self._wrap_path = not self._wrap_path
         self._rebuild_table()
+        self._set_status(None)
+
+    def action_clear(self) -> None:
+        self._all_packets = []
+        self._displayed = []
+        self._seen_ids = set()
+        self._packets_by_id = {}
+        self.query_one("#packets", DataTable).clear()
         self._set_status(None)
 
     def _set_status(self, error: str | None) -> None:
