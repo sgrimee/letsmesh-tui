@@ -40,6 +40,41 @@ def resolve_name(origin_id: str, db: dict) -> str:
     return "/".join(names) + "?"
 
 
+def decode_path_from_raw(raw_data: str) -> list[str] | None:
+    """Decode path hops directly from raw MeshCore packet bytes.
+
+    Wire format (non-transport):
+      Byte 0:  header  (bits 0-1 = route_type)
+      Byte 1:  path_len  (bits 7-6 = hash_size-1, bits 5-0 = hop count)
+      Bytes 2+: hop data  (count × hash_size bytes)
+
+    Transport packets (route_type 0x00 or 0x03) have 4 extra bytes
+    (transport codes) before path_len, so path_len is at byte 5.
+
+    Returns list of hex strings (one per hop) or None on any parse error.
+    """
+    try:
+        raw = bytes.fromhex(raw_data)
+        if len(raw) < 2:
+            return None
+        route_type = raw[0] & 0x03
+        path_len_offset = 5 if route_type in (0x00, 0x03) else 1
+        if len(raw) <= path_len_offset:
+            return None
+        path_len_byte = raw[path_len_offset]
+        hash_size = (path_len_byte >> 6) + 1
+        count = path_len_byte & 0x3F
+        path_start = path_len_offset + 1
+        if len(raw) < path_start + count * hash_size:
+            return None
+        return [
+            raw[path_start + i * hash_size: path_start + (i + 1) * hash_size].hex()
+            for i in range(count)
+        ]
+    except Exception:
+        return None
+
+
 def get_source(path_list: list, db: dict, resolve: bool = True) -> str:
     """Return the source node (first path element)."""
     if not path_list:
@@ -92,7 +127,7 @@ def _build_detail_text(packet: dict, db: dict) -> str:
         "",
     ]
 
-    full_path = p.get("path") or []
+    full_path = p.get("_path") or []
     if not full_path:
         lines.append("[dim]Source:[/dim]     (unknown — direct to observer)")
         lines.append("[dim]Relays:[/dim]     none")
@@ -332,6 +367,8 @@ class PacketMonitorApp(App):
             return
         for p in new:
             self._seen_ids.add(p["id"])
+            decoded = decode_path_from_raw(p.get("raw_data", ""))
+            p["_path"] = decoded if decoded is not None else (p.get("path") or [])
             self._packets_by_id[p["id"]] = p
         self._all_packets = (new + self._all_packets)[:MAX_PACKETS]
         visible_ids = {p["id"] for p in self._all_packets}
@@ -348,7 +385,7 @@ class PacketMonitorApp(App):
     def _packet_matches(self, p: dict) -> bool:
         f = self._pkt_filters
         obs_id = p.get("origin_id", "")
-        path_ids = p.get("path") or []
+        path_ids = p.get("_path") or []
 
         if f["observer"]:
             t = f["observer"].lower()
@@ -381,7 +418,7 @@ class PacketMonitorApp(App):
             ptype = format_payload_type(p.get("payload_type", ""))
             snr = f"{p['snr']:.1f}" if p.get("snr") is not None else "-"
             rssi = str(p.get("rssi", "-"))
-            raw_path = p.get("path") or []
+            raw_path = p.get("_path") or []
             path = format_path(raw_path, self._db, resolve=self._resolve_path)
             if self._wrap_path:
                 wrap_width = max(20, self.size.width - 58)
