@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 import time
 from datetime import datetime, timezone
 
@@ -245,6 +246,7 @@ class PacketMonitorApp(App):
         Binding("p", "pause", "Pause/Resume"),
         Binding("f", "filter", "Filter"),
         Binding("n", "toggle_names", "Names"),
+        Binding("w", "toggle_wrap", "Wrap"),
     ]
     CSS = """
     DataTable {
@@ -270,6 +272,7 @@ class PacketMonitorApp(App):
         self._packets_by_id: dict[str, dict] = {}
         self._displayed: list[dict] = []
         self._resolve_path: bool = True
+        self._wrap_path: bool = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -359,7 +362,15 @@ class PacketMonitorApp(App):
             snr = f"{p['snr']:.1f}" if p.get("snr") is not None else "-"
             rssi = str(p.get("rssi", "-"))
             path = format_path(p.get("path") or [], self._db, resolve=self._resolve_path)
-            table.add_row(time_str, node, ptype, snr, rssi, path, key=p["id"])
+            if self._wrap_path:
+                wrap_width = max(20, self.size.width - 58)
+                lines = textwrap.wrap(path, width=wrap_width) or [path]
+                path_cell = "\n".join(lines)
+                row_height = len(lines)
+            else:
+                path_cell = path
+                row_height = 1
+            table.add_row(time_str, node, ptype, snr, rssi, path_cell, height=row_height, key=p["id"])
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if not self._displayed:
@@ -371,6 +382,11 @@ class PacketMonitorApp(App):
         self._rebuild_table()
         self._set_status(None)
 
+    def action_toggle_wrap(self) -> None:
+        self._wrap_path = not self._wrap_path
+        self._rebuild_table()
+        self._set_status(None)
+
     def _set_status(self, error: str | None) -> None:
         state = "[PAUSED]" if self._paused else "[LIVE]"
         parts = []
@@ -379,11 +395,12 @@ class PacketMonitorApp(App):
         if self._pkt_filters["path_node"]: parts.append(f"path={markup_escape(self._pkt_filters['path_node'])}")
         filt = f"  ({', '.join(parts)})" if parts else ""
         names = "  path:names" if self._resolve_path else "  path:hops"
+        wrap = "  wrap:on" if self._wrap_path else ""
         count = len(self._all_packets)
         now = datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
         err = f"  ERROR: {error}" if error else ""
         self.query_one("#status", Label).update(
-            f"{state}{filt}{names}  {count} packets  last: {now}{err}"
+            f"{state}{filt}{names}{wrap}  {count} packets  last: {now}{err}"
         )
 
     def action_refresh(self) -> None:
