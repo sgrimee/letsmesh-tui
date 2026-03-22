@@ -1,12 +1,11 @@
 """Tests for lma.letsmesh_api."""
 
 import json
-from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lma.letsmesh_api import ROLE_MAP, fetch_nodes, fetch_packets
+from lma.letsmesh_api import fetch_nodes, fetch_packets
 
 
 NODES_FIXTURE = {
@@ -26,7 +25,7 @@ PACKETS_FIXTURE = {
 }
 
 
-def _mock_urlopen(fixture: dict):
+def _mock_urlopen(fixture: dict | list):
     resp = MagicMock()
     resp.read.return_value = json.dumps(fixture).encode()
     resp.__enter__ = lambda s: s

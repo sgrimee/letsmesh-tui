@@ -54,8 +54,8 @@ def test_lookup_invalid_prefix_exits(mock_db):
 def test_list_nodes_sorted_by_name(mock_db, capsys):
     list_nodes()
     out = capsys.readouterr().out
-    lines = [l for l in out.splitlines() if l.strip() and not l.startswith("\n")]
-    names = [l.split()[0] for l in lines if not l.startswith("3")]
+    lines = [line for line in out.splitlines() if line.strip() and not line.startswith("\n")]
+    names = [line.split()[0] for line in lines if not line.startswith("3")]
     assert names.index("alpha-node") < names.index("beta-node")
     assert names.index("beta-node") < names.index("partial-node")
 

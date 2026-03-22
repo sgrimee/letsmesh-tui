@@ -38,7 +38,7 @@ def test_lookup_coords_missing_lon():
 # collect_map_nodes helpers
 # ---------------------------------------------------------------------------
 
-def _make_advert_hex(pub_key: bytes, lat: float, lon: float, name: str) -> str:
+def _make_advert_hex(pub_key: bytes, lat: float, lon: float, name: str) -> bytes:
     """Build a minimal Flood+Advert packet with location and name."""
     header = 0x11  # Flood(0x01) | Advert(0x04 << 2)
     path_byte = 0x00

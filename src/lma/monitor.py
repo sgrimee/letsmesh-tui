@@ -574,9 +574,12 @@ class PacketMonitorApp(App):
     def _set_status(self, error: str | None) -> None:
         state = "[PAUSED]" if self._paused else "[LIVE]"
         parts = []
-        if self._pkt_filters["observer"]: parts.append(f"obs={markup_escape(self._pkt_filters['observer'])}")
-        if self._pkt_filters["node"]: parts.append(f"node={markup_escape(self._pkt_filters['node'])}")
-        if self._pkt_filters["path_node"]: parts.append(f"path={markup_escape(self._pkt_filters['path_node'])}")
+        if self._pkt_filters["observer"]:
+            parts.append(f"obs={markup_escape(self._pkt_filters['observer'])}")
+        if self._pkt_filters["node"]:
+            parts.append(f"node={markup_escape(self._pkt_filters['node'])}")
+        if self._pkt_filters["path_node"]:
+            parts.append(f"path={markup_escape(self._pkt_filters['path_node'])}")
         filt = f"  ({', '.join(parts)})" if parts else ""
         names = ("  path:names", "  path:src+hex", "  path:hex")[2 - self._resolve_path]
         wrap = "  wrap:on" if self._wrap_path else ""

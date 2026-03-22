@@ -1,7 +1,6 @@
 """lma — letsmesh analyzer CLI entry point."""
 
 import argparse
-import sys
 
 from lma.letsmesh_api import DEFAULT_REGION
 

@@ -1,10 +1,8 @@
 """Tests for lma.db."""
 
 import json
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from lma.db import learn_from_advert, load_db, parse_input_file, resolve_name, save_db, update
 

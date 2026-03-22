@@ -13,14 +13,14 @@ def _header(route_type: int, payload_type: int, version: int = 0) -> int:
     return (version << 6) | (payload_type << 2) | route_type
 
 
-def _flood_ack(payload: bytes = b"\xaa\xbb") -> str:
+def _flood_ack(payload: bytes = b"\xaa\xbb") -> bytes:
     """Flood + Ack, no hops."""
     header = _header(route_type=0x01, payload_type=0x03)  # Flood + Ack
     path_byte = 0x00  # hash_size=1, 0 hops
     return bytes([header, path_byte]) + payload
 
 
-def _flood_textmsg(dest: bytes, src: bytes, hops: list[bytes] = ()) -> bytes:
+def _flood_textmsg(dest: bytes, src: bytes, hops: tuple[bytes, ...] | list[bytes] = ()) -> bytes:
     """Flood + TextMessage with optional relay hops."""
     header = _header(route_type=0x01, payload_type=0x02)  # Flood + TextMessage
     hop_count = len(hops)
