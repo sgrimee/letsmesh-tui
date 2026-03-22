@@ -16,7 +16,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
 from lma.api import DEFAULT_REGION, fetch_packets
-from lma.db import load_db
+from lma.db import learn_from_advert, load_db, save_db
 from lma.decoder import decode_packet
 
 MAX_PACKETS = 500
@@ -469,20 +469,27 @@ class PacketMonitorApp(App):
         if not new:
             self._set_status(None)
             return
+        db_dirty = False
         for p in new:
             self._seen_ids.add(p["id"])
             decoded = decode_path_from_raw(p.get("raw_data", ""))
             p["_path"] = decoded if decoded is not None else (p.get("path") or [])
-            # Extract src_hash from payload prefix for direct packets (empty path)
             pkt_dec = decode_packet(p.get("raw_data", "") or "")
             decoded_payload = pkt_dec.get("decoded") or {}
             p["_src_hash"] = decoded_payload.get("src_hash", "")
             p["_route_type"] = pkt_dec.get("route_type", "")
-            # For Advert packets, public_key IS the sender; 6 bytes avoids collisions
-            if not p["_src_hash"] and decoded_payload.get("public_key"):
-                p["_src_hash"] = decoded_payload["public_key"][:12]
             p["_path_hop_size"] = pkt_dec.get("path_hop_size", 1)
+            # For Advert packets, learn node identity and use full key as src
+            if pkt_dec.get("payload_type") == "Advert" and decoded_payload.get("public_key"):
+                pub = decoded_payload["public_key"]
+                name = decoded_payload.get("name") or pub[:8]
+                role = decoded_payload.get("role", "")
+                if learn_from_advert(self._db, pub, name, role):
+                    db_dirty = True
+                p["_src_hash"] = pub[:12]
             self._packets_by_id[p["id"]] = p
+        if db_dirty:
+            save_db(self._db)
         self._all_packets = (new + self._all_packets)[:MAX_PACKETS]
         visible_ids = {p["id"] for p in self._all_packets}
         self._packets_by_id = {k: v for k, v in self._packets_by_id.items() if k in visible_ids}

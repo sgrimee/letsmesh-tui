@@ -6,6 +6,10 @@ from pathlib import Path
 
 from lma.api import DEFAULT_REGION, fetch_nodes
 
+_ADVERT_ROLE_SHORT = {
+    "ChatNode": "CLI", "Repeater": "REP", "RoomServer": "RMS", "Sensor": "CLT",
+}
+
 DB_FILE = Path(__file__).parent.parent.parent / "nodes.json"
 INPUT_DIR = Path(__file__).parent.parent.parent / "input"
 
@@ -17,7 +21,37 @@ def load_db() -> dict:
 
 
 def save_db(db: dict) -> None:
-    DB_FILE.write_text(json.dumps(db, indent=2, sort_keys=True) + "\n")
+    tmp = DB_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(db, indent=2, sort_keys=True) + "\n")
+    tmp.replace(DB_FILE)
+
+
+def learn_from_advert(db: dict, public_key: str, name: str, role: str) -> bool:
+    """Add or update a node learned from a live Advert packet.
+
+    Returns True if the database was modified (caller should save).
+    Only updates name/role if the node was previously unknown or learned
+    from another advert (source='advert') — never overwrites input-file or API entries.
+    """
+    key = public_key.lower()
+    if len(key) != 64:
+        return False
+    existing = db["nodes"].get(key)
+    if existing:
+        source = existing.get("source", "")
+        if not source.startswith(("api:", "advert")):
+            # Don't overwrite hand-curated input-file entries
+            return False
+        short_role = _ADVERT_ROLE_SHORT.get(role, role)
+        if existing.get("name") == name and existing.get("type") == short_role:
+            return False  # nothing changed
+    db["nodes"][key] = {
+        "name": name,
+        "type": _ADVERT_ROLE_SHORT.get(role, role),
+        "source": "advert",
+        "key_complete": True,
+    }
+    return True
 
 
 def parse_input_file(path) -> dict[str, dict]:
