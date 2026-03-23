@@ -293,10 +293,8 @@ class FilterScreen(ModalScreen[dict]):
         yield Static("Packet Filters  (name or hex address)", id="title", markup=False)
         yield Static("Observer:", markup=False)
         yield Input(value=self._pkt_filters.get("observer", ""), placeholder="e.g.  gw-home  or  ab cd ef", id="observer")
-        yield Static("Any node (observer, source or relay):", markup=False)
-        yield Input(value=self._pkt_filters.get("node", ""), placeholder="e.g.  relay  or  ab cd", id="node")
-        yield Static("Relay node (in path):", markup=False)
-        yield Input(value=self._pkt_filters.get("path_node", ""), placeholder="e.g.  relay  or  ab cd", id="path_node")
+        yield Static("Node in path (source or relay):", markup=False)
+        yield Input(value=self._pkt_filters.get("path_node", ""), placeholder="e.g.  relay  or  f4  or  ab cd", id="path_node")
         yield Static("↵ apply · Esc clear all · Tab next field", id="hint", markup=False)
 
     def on_mount(self) -> None:
@@ -308,12 +306,11 @@ class FilterScreen(ModalScreen[dict]):
     def _apply(self) -> None:
         self.dismiss({
             "observer": self.query_one("#observer", Input).value.strip(),
-            "node": self.query_one("#node", Input).value.strip(),
             "path_node": self.query_one("#path_node", Input).value.strip(),
         })
 
     def action_clear_all(self) -> None:
-        self.dismiss({"observer": "", "node": "", "path_node": ""})
+        self.dismiss({"observer": "", "path_node": ""})
 
 
 class PacketDetailScreen(ModalScreen):
@@ -410,7 +407,7 @@ class PacketMonitorApp(App):
         self._db: dict = {"nodes": {}}
         self._seen_ids: set[str] = set()
         self._paused = False
-        self._pkt_filters: dict = {"observer": "", "node": "", "path_node": ""}
+        self._pkt_filters: dict = {"observer": "", "path_node": ""}
         self._all_packets: list[dict] = []
         self._packets_by_id: dict[str, dict] = {}
         self._displayed: list[dict] = []
@@ -495,6 +492,7 @@ class PacketMonitorApp(App):
         f = self._pkt_filters
         obs_id = p.get("origin_id", "")
         path_ids = p.get("_path") or []
+        src_hash = p.get("_src_hash", "")
 
         if f["observer"]:
             t = f["observer"].lower()
@@ -502,13 +500,15 @@ class PacketMonitorApp(App):
             if t not in origin_name and not self._node_matches(f["observer"], obs_id):
                 return False
 
-        if f["node"]:
-            all_ids = [obs_id] + list(path_ids)
-            if not any(self._node_matches(f["node"], nid) for nid in all_ids):
+        if f["path_node"]:
+            obs_id_lower = obs_id.lower()
+            def _is_obs(nid: str) -> bool:
+                n = nid.lower()
+                return obs_id_lower.startswith(n) or n.startswith(obs_id_lower)
+            path_and_src = [nid for nid in list(path_ids) + ([src_hash] if src_hash else [])
+                            if nid and not _is_obs(nid)]
+            if not any(self._node_matches(f["path_node"], nid) for nid in path_and_src):
                 return False
-
-        if f["path_node"] and not any(self._node_matches(f["path_node"], nid) for nid in path_ids):
-            return False
 
         return True
 
@@ -576,8 +576,6 @@ class PacketMonitorApp(App):
         parts = []
         if self._pkt_filters["observer"]:
             parts.append(f"obs={markup_escape(self._pkt_filters['observer'])}")
-        if self._pkt_filters["node"]:
-            parts.append(f"node={markup_escape(self._pkt_filters['node'])}")
         if self._pkt_filters["path_node"]:
             parts.append(f"path={markup_escape(self._pkt_filters['path_node'])}")
         filt = f"  ({', '.join(parts)})" if parts else ""
