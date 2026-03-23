@@ -168,16 +168,42 @@ def _boxes_overlap(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -
     return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
 
 
-def _pick_label_pos(draw, font, px: int, py: int, label: str,
-                    placed_boxes: list[tuple[int, int, int, int]],
-                    pad: int = 6) -> tuple[int, int]:
-    """Return (x, y) for the label near marker at (px, py) that avoids placed_boxes.
+def _segment_crosses_box(
+    x1: float, y1: float, x2: float, y2: float,
+    box: tuple[int, int, int, int],
+) -> bool:
+    """Liang-Barsky: True if segment (x1,y1)-(x2,y2) intersects axis-aligned box."""
+    bx0, by0, bx1, by1 = box
+    dx, dy = x2 - x1, y2 - y1
+    ps = (-dx, dx, -dy, dy)
+    qs = (x1 - bx0, bx1 - x1, y1 - by0, by1 - y1)
+    t0, t1 = 0.0, 1.0
+    for pi, qi in zip(ps, qs):
+        if pi == 0:
+            if qi < 0:
+                return False
+        elif pi < 0:
+            t0 = max(t0, qi / pi)
+        else:
+            t1 = min(t1, qi / pi)
+    return t0 <= t1
 
-    Tries eight candidate positions around the marker (right, left, above, below,
-    and diagonals).  Falls back to the default right position if all overlap.
+
+def _pick_label_pos(
+    draw, font, px: int, py: int, label: str,
+    placed_boxes: list[tuple[int, int, int, int]],
+    line_segs: list[tuple[float, float, float, float]] | None = None,
+    pad: int = 6,
+) -> tuple[int, int]:
+    """Return (x, y) for the label near marker at (px, py).
+
+    Priority:
+      1. Avoids other labels AND path lines.
+      2. Avoids other labels only (line overlap tolerated).
+      3. Default right position (last resort).
     """
     w = int(draw.textlength(label, font=font))
-    M = 14  # margin from marker edge (marker radius ~13 px)
+    M = 20  # margin from marker edge (marker radius ~13 px)
     candidates = [
         (M, -10),               # right (default)
         (M, -50),               # above-right
@@ -188,17 +214,34 @@ def _pick_label_pos(draw, font, px: int, py: int, label: str,
         (-w // 2, -(M + 30)),   # above-centre
         (-w // 2, M + 10),      # below-centre
     ]
+
+    def _make_bbox(x: int, y: int) -> tuple[int, int, int, int]:
+        bx0, t, bx1, b = draw.textbbox((x, y), label, font=font)
+        return (bx0 - pad, t - pad, bx1 + pad, b + pad)
+
+    best_label_safe: tuple[int, int, tuple[int, int, int, int]] | None = None
+
     for dx, dy in candidates:
         x, y = px + dx, py + dy
-        bx0, t, bx1, b = draw.textbbox((x, y), label, font=font)
-        bbox = (bx0 - pad, t - pad, bx1 + pad, b + pad)
-        if all(not _boxes_overlap(bbox, existing) for existing in placed_boxes):
-            placed_boxes.append(bbox)
-            return x, y
-    # All positions overlap — use default and record it anyway
+        bbox = _make_bbox(x, y)
+        if any(_boxes_overlap(bbox, existing) for existing in placed_boxes):
+            continue  # always skip label overlaps
+        if line_segs and any(_segment_crosses_box(*seg, bbox) for seg in line_segs):
+            if best_label_safe is None:
+                best_label_safe = (x, y, bbox)  # keep as fallback
+            continue
+        # Perfect: no label overlap, no line overlap
+        placed_boxes.append(bbox)
+        return x, y
+
+    if best_label_safe is not None:
+        x, y, bbox = best_label_safe
+        placed_boxes.append(bbox)
+        return x, y
+
+    # Last resort: default position regardless of overlaps
     x, y = px + M, py - 10
-    bx0, t, bx1, b = draw.textbbox((x, y), label, font=font)
-    placed_boxes.append((bx0 - pad, t - pad, bx1 + pad, b + pad))
+    placed_boxes.append(_make_bbox(x, y))
     return x, y
 
 
@@ -239,13 +282,25 @@ def _render_tile_map(
     image = m.render()
     draw = ImageDraw.Draw(image)
 
+    # Build path line segments in pixel coords (zoom is fixed after render())
+    line_segs: list[tuple[float, float, float, float]] = []
+    if len(path_coords) >= 2:
+        pts_px = [
+            (m._x_to_px(_lon_to_x(lon, m.zoom)), m._y_to_px(_lat_to_y(lat, m.zoom)))
+            for lat, lon in path_coords
+        ]
+        for i in range(len(pts_px) - 1):
+            ax, ay = pts_px[i]
+            bx, by = pts_px[i + 1]
+            line_segs.append((ax, ay, bx, by))
+
     placed_label_boxes: list[tuple[int, int, int, int]] = []
 
     for label, role, lat, lon in placed:
         hex_color, _ = _ROLE_COLORS.get(role, ("#ffffff", "white"))
         px = m._x_to_px(_lon_to_x(lon, m.zoom))
         py = m._y_to_px(_lat_to_y(lat, m.zoom))
-        lx, ly = _pick_label_pos(draw, font, px, py, label, placed_label_boxes)
+        lx, ly = _pick_label_pos(draw, font, px, py, label, placed_label_boxes, line_segs)
         draw.text((lx, ly), label, fill="#000000", font=font)
 
     return image
