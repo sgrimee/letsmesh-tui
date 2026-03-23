@@ -222,6 +222,112 @@ def _legend() -> str:
     )
 
 
+class MapSidePanel(Vertical):
+    """Map panel widget for embedding as a side panel in the main monitor.
+
+    Call load_packet(packets, index, db) to render the map for a given packet.
+    """
+
+    DEFAULT_CSS = """
+    MapSidePanel {
+        height: 1fr;
+    }
+    MapSidePanel #map_side_header {
+        height: auto;
+        padding: 0 1;
+        color: $text-muted;
+    }
+    MapSidePanel #map_side_body {
+        height: 1fr;
+        overflow: hidden hidden;
+    }
+    MapSidePanel #map_side_footer {
+        height: auto;
+        padding: 0 1;
+    }
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._map_widget = None
+
+    def compose(self) -> ComposeResult:
+        yield Static("", id="map_side_header", markup=True)
+        yield Container(id="map_side_body")
+        yield Static("", id="map_side_footer", markup=True)
+
+    def load_packet(self, packets: list[dict], index: int, db: dict) -> None:
+        """Render the map for packets[index]."""
+        p = packets[index]
+        placed, unplaced, path_coords = collect_map_nodes(p, db)
+
+        self.query_one("#map_side_header", Static).update(
+            f"[dim]Packet {index + 1}/{len(packets)}[/dim]"
+        )
+        footer_lines = [_legend()]
+        if unplaced:
+            footer_lines.append("[dim]No coords:[/dim] " + ", ".join(unplaced))
+        self.query_one("#map_side_footer", Static).update("\n".join(footer_lines))
+
+        if self._map_widget is not None:
+            self._map_widget.remove()
+            self._map_widget = None
+
+        map_body = self.query_one("#map_side_body", Container)
+
+        if not _HAS_MAP_LIBS:
+            w = Static(
+                "[dim]Map requires: pip install 'lma[map]'[/dim]", markup=True
+            )
+            map_body.mount(w)
+            self._map_widget = w
+        elif not placed:
+            w = Static(
+                "[dim]No coordinates available for this packet.[/dim]", markup=True
+            )
+            map_body.mount(w)
+            self._map_widget = w
+        else:
+            w = Static("[dim]Fetching map tiles…[/dim]", markup=True)
+            map_body.mount(w)
+            self._map_widget = w
+            self._fetch_tiles(placed, path_coords, map_body.size.width, map_body.size.height)
+
+    @work(thread=True, exclusive=True)
+    def _fetch_tiles(
+        self,
+        placed: list[tuple[str, str, float, float]],
+        path_coords: list[tuple[float, float]],
+        w_cells: int,
+        h_cells: int,
+    ) -> None:
+        cw, ch = _cell_px_size()
+        width_px = max(w_cells * cw, 400)
+        height_px = max(h_cells * ch, 300)
+        try:
+            pil_image = _render_tile_map(placed, path_coords, width_px, height_px)
+            self.app.call_from_thread(self._show_tile_image, pil_image)
+        except Exception as e:
+            self.app.call_from_thread(
+                self._show_error,
+                f"[red]Map error:[/red] {markup_escape(str(e))}",
+            )
+
+    def _show_tile_image(self, pil_image) -> None:
+        if self._map_widget is not None:
+            self._map_widget.remove()
+        img = TileImage(pil_image)
+        self.query_one("#map_side_body", Container).mount(img)
+        self._map_widget = img
+
+    def _show_error(self, text: str) -> None:
+        if self._map_widget is not None:
+            self._map_widget.remove()
+        w = Static(text, markup=True)
+        self.query_one("#map_side_body", Container).mount(w)
+        self._map_widget = w
+
+
 class PacketMapScreen(ModalScreen):
     """OSM tile map view of nodes involved in a packet, with up/down navigation.
 
@@ -252,7 +358,7 @@ class PacketMapScreen(ModalScreen):
     """
 
     BINDINGS = [
-        Binding("escape,q,m", "dismiss", "Close"),
+        Binding("escape,q", "dismiss", "Close"),
         Binding("up,k", "prev", "Previous"),
         Binding("down,j", "next", "Next"),
     ]
@@ -280,7 +386,7 @@ class PacketMapScreen(ModalScreen):
         placed, unplaced, path_coords = collect_map_nodes(p, self._db)
 
         self.query_one("#map_header", Static).update(
-            f"[dim]({self._index + 1}/{n}  ↑↓ navigate  m/q close)[/dim]"
+            f"[dim]({self._index + 1}/{n}  ↑↓ navigate  q/Esc close)[/dim]"
         )
 
         footer_lines = [_legend()]

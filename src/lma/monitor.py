@@ -12,13 +12,14 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.screen import ModalScreen
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
 from lma.letsmesh_api import DEFAULT_REGION, fetch_packets
 from lma.db import learn_from_advert, load_db, resolve_name, save_db
 from lma.decoder import decode_packet
-from lma.map_view import PacketMapScreen
+from lma.map_view import MapSidePanel, PacketMapScreen
 
 MAX_PACKETS = 500
 
@@ -335,7 +336,7 @@ class PacketDetailScreen(ModalScreen):
         Binding("escape,q", "dismiss", "Close"),
         Binding("up,k", "prev", "Previous"),
         Binding("down,j", "next", "Next"),
-        Binding("m", "open_map", "Map"),
+        Binding("shift+m", "open_map", "Map popup"),
     ]
 
     def __init__(self, packets: list[dict], index: int, db: dict):
@@ -353,7 +354,7 @@ class PacketDetailScreen(ModalScreen):
     def _refresh_content(self) -> None:
         p = self._packets[self._index]
         n = len(self._packets)
-        header = f"[dim]({self._index + 1}/{n}  ↑↓ navigate  m map)[/dim]\n"
+        header = f"[dim]({self._index + 1}/{n}  ↑↓ navigate  shift+m map)[/dim]\n"
         self.query_one("#content", Static).update(
             header + _build_detail_text(p, self._db)
         )
@@ -383,14 +384,34 @@ class PacketMonitorApp(App):
         Binding("r", "refresh", "Refresh"),
         Binding("p", "pause", "Pause/Resume"),
         Binding("f", "filter", "Filter"),
-        Binding("m", "open_map", "Map"),
+        Binding("d", "toggle_detail_panel", "Detail"),
+        Binding("shift+d", "open_detail", "Detail popup"),
+        Binding("m", "toggle_map_panel", "Map"),
+        Binding("shift+m", "open_map", "Map popup"),
         Binding("n", "toggle_names", "Names"),
         Binding("w", "toggle_wrap", "Wrap"),
         Binding("c", "clear", "Clear"),
     ]
     CSS = """
-    DataTable {
+    #main_area {
         height: 1fr;
+    }
+    DataTable {
+        width: 1fr;
+        height: 1fr;
+    }
+    #detail_side {
+        display: none;
+        width: 60;
+        border-left: solid $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    MapSidePanel {
+        display: none;
+        width: 60;
+        border-left: solid $accent;
+        background: $surface;
     }
     #status {
         height: 1;
@@ -413,10 +434,16 @@ class PacketMonitorApp(App):
         self._displayed: list[dict] = []
         self._resolve_path: int = 2  # 2=all names, 1=src name+relay hex, 0=all hex
         self._wrap_path: bool = False
+        self._detail_panel_open: bool = False
+        self._map_panel_open: bool = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield DataTable(id="packets")
+        with Horizontal(id="main_area"):
+            yield DataTable(id="packets")
+            with VerticalScroll(id="detail_side"):
+                yield Static("", id="detail_content", markup=True)
+            yield MapSidePanel(id="map_side")
         yield Label("", id="status")
         yield Footer()
 
@@ -541,17 +568,57 @@ class PacketMonitorApp(App):
                 path_cell = path
                 row_height = 1
             table.add_row(time_str, node, ptype, snr, rssi, path_cell, height=row_height, key=p["id"])
+        if self._displayed:
+            if self._detail_panel_open:
+                self._update_detail_side(0)
+            if self._map_panel_open:
+                self._update_map_side(0)
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+    def action_open_detail(self) -> None:
         if not self._displayed:
             return
-        self.push_screen(PacketDetailScreen(self._displayed, event.cursor_row, self._db))
+        row = self.query_one("#packets", DataTable).cursor_row
+        self.push_screen(PacketDetailScreen(self._displayed, row, self._db))
 
     def action_open_map(self) -> None:
         if not self._displayed:
             return
         row = self.query_one("#packets", DataTable).cursor_row
         self.push_screen(PacketMapScreen(self._displayed, row, self._db))
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        row = event.cursor_row
+        if not self._displayed or row >= len(self._displayed):
+            return
+        if self._detail_panel_open:
+            self._update_detail_side(row)
+        if self._map_panel_open:
+            self._update_map_side(row)
+
+    def _update_detail_side(self, row: int) -> None:
+        if not self._displayed or row >= len(self._displayed):
+            return
+        p = self._displayed[row]
+        self.query_one("#detail_content", Static).update(_build_detail_text(p, self._db))
+
+    def _update_map_side(self, row: int) -> None:
+        if not self._displayed or row >= len(self._displayed):
+            return
+        self.query_one(MapSidePanel).load_packet(self._displayed, row, self._db)
+
+    def action_toggle_detail_panel(self) -> None:
+        self._detail_panel_open = not self._detail_panel_open
+        self.query_one("#detail_side", VerticalScroll).display = self._detail_panel_open
+        if self._detail_panel_open:
+            row = self.query_one("#packets", DataTable).cursor_row
+            self._update_detail_side(row)
+
+    def action_toggle_map_panel(self) -> None:
+        self._map_panel_open = not self._map_panel_open
+        self.query_one(MapSidePanel).display = self._map_panel_open
+        if self._map_panel_open:
+            row = self.query_one("#packets", DataTable).cursor_row
+            self._update_map_side(row)
 
     def action_toggle_names(self) -> None:
         self._resolve_path = (self._resolve_path - 1) % 3
