@@ -43,6 +43,28 @@ lma nodes list --by-key
 lma monitor
 ```
 
+### Monitor keybindings
+
+| Key | Action |
+|---|---|
+| `d` | Toggle detail side panel |
+| `shift+d` | Open detail popup |
+| `m` | Toggle map side panel |
+| `shift+m` | Open map popup |
+| `l` | Toggle panel layout: right-stacked ↔ bottom side-by-side |
+| `a` | Toggle follow mode (auto-scroll to newest packet) |
+| `f` | Filter packets by observer or node in path |
+| `n` | Cycle path display: names → src+hex → hex |
+| `w` | Toggle path word-wrap |
+| `p` | Pause / resume live updates |
+| `r` | Force refresh |
+| `c` | Clear packet list |
+| `q` | Quit |
+
+**Side panels** update live as you move the cursor. Both panels can be open at the same time. With `l`, switch between panels stacked on the right (default) or placed side by side at the bottom of the screen.
+
+**Follow mode** (`a`) is on by default — the cursor tracks the newest incoming packet. Turn it off to stay on a selected packet while new packets continue to arrive in the background.
+
 ## Data sources
 
 ### Input files (`input/*.txt`)
