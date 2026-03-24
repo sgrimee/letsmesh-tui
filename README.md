@@ -63,7 +63,9 @@ lma monitor
 
 **Side panels** update live as you move the cursor. Both panels can be open at the same time. With `l`, switch between panels stacked on the right (default) or placed side by side at the bottom of the screen.
 
-**Follow mode** (`a`) is on by default — the cursor tracks the newest incoming packet. Turn it off to stay on a selected packet while new packets continue to arrive in the background.
+**Follow mode** (`a`) is off by default — the cursor stays on the selected packet while new packets arrive in the background. Turn it on to auto-scroll to the newest packet.
+
+**Input-file nodes** (from `input/*.txt`) are highlighted in yellow in the path column and detail panel, making it easy to spot your own nodes in packet paths.
 
 ## Data sources
 

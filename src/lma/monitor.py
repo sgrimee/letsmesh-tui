@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timezone
 
 from rich.markup import escape as markup_escape
+from rich.text import Text
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -17,7 +18,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
 from lma.letsmesh_api import DEFAULT_REGION, fetch_packets
-from lma.db import learn_from_advert, load_db, resolve_name, save_db
+from lma.db import is_input_node, learn_from_advert, load_db, resolve_name, save_db
 from lma.decoder import decode_packet
 from lma.map_view import MapSidePanel, PacketMapScreen
 
@@ -72,14 +73,16 @@ def format_path(path_list: list, db: dict, resolve: int = 2,
     """
     is_direct = route_type in ("Direct", "TransportDirect")
 
+    def _fmt(display: str, node_id: str) -> str:
+        return f"[yellow]{display}[/yellow]" if is_input_node(node_id, db) else display
+
     # Determine source display (trim src_hash to hop_size for visual consistency)
     if src_hash:
-        if resolve >= 1:
-            src = resolve_name(src_hash, db)
-        else:
-            src = _trim_hash(src_hash, hop_size)
+        text = resolve_name(src_hash, db) if resolve >= 1 else _trim_hash(src_hash, hop_size)
+        src = _fmt(text, src_hash)
     elif path_list and not is_direct:
-        src = resolve_name(path_list[0], db) if resolve >= 1 else path_list[0]
+        text = resolve_name(path_list[0], db) if resolve >= 1 else path_list[0]
+        src = _fmt(text, path_list[0])
     else:
         src = "?"
 
@@ -90,9 +93,9 @@ def format_path(path_list: list, db: dict, resolve: int = 2,
         return src
 
     if resolve >= 2:
-        relay_parts = [resolve_name(hop, db) for hop in relays]
+        relay_parts = [_fmt(resolve_name(hop, db), hop) for hop in relays]
     else:
-        relay_parts = relays  # raw hex (already hop_size bytes from path)
+        relay_parts = [_fmt(hop, hop) for hop in relays]
 
     return " → ".join([src] + relay_parts)
 
@@ -124,6 +127,8 @@ def _fmt_hash(h: str, db: dict, hop_size: int = 1) -> str:
     """Format a hash with its resolved name. Display truncated to hop_size bytes."""
     display = _trim_hash(h, hop_size)
     name = resolve_name(h, db)
+    if is_input_node(h, db):
+        return f"[dim yellow]{display}[/dim yellow]  [yellow]{name}[/yellow]"
     return f"[dim]{display}[/dim]  {name}"
 
 
@@ -461,7 +466,7 @@ class PacketMonitorApp(App):
         self._wrap_path: bool = False
         self._detail_panel_open: bool = False
         self._map_panel_open: bool = False
-        self._follow: bool = True
+        self._follow: bool = False
         self._layout_bottom: bool = False
 
     def compose(self) -> ComposeResult:
@@ -596,10 +601,10 @@ class PacketMonitorApp(App):
             if self._wrap_path:
                 wrap_width = max(20, self.size.width - 58)
                 lines = textwrap.wrap(path, width=wrap_width) or [path]
-                path_cell = "\n".join(lines)
+                path_cell = Text.from_markup("\n".join(lines))
                 row_height = len(lines)
             else:
-                path_cell = path
+                path_cell = Text.from_markup(path)
                 row_height = 1
             table.add_row(time_str, node, ptype, snr, rssi, path_cell, height=row_height, key=p["id"])
         # Restore cursor: pin to previous packet (no-follow) or stay at 0 (follow)

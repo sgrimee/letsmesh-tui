@@ -91,6 +91,17 @@ def parse_input_file(path) -> dict[str, dict]:
     return nodes
 
 
+def is_input_node(node_id: str, db: dict) -> bool:
+    """Return True if node_id matches an input-file entry (user-owned node)."""
+    node_id = node_id.lower()
+    for key, entry in db.get("nodes", {}).items():
+        if key.startswith(node_id) or node_id.startswith(key[: len(node_id)]):
+            source = entry.get("source", "")
+            if source and not source.startswith(("api:", "advert")):
+                return True
+    return False
+
+
 def resolve_name(origin_id: str, db: dict) -> str:
     """Resolve a key prefix to a display name.
 
@@ -136,7 +147,7 @@ def update(region: str = DEFAULT_REGION) -> None:
                 partial_data = db["nodes"].pop(matched)
                 db["nodes"][full_key] = {**api_node, **{
                     k: v for k, v in partial_data.items()
-                    if k in ("type", "routing") and v
+                    if k in ("type", "routing", "source") and v
                 }, "key_complete": True}
             else:
                 db["nodes"][full_key] = api_node
