@@ -22,7 +22,7 @@ import hashlib
 import hmac
 import re
 import struct
-import warnings
+import sys
 
 from Crypto.Cipher import AES  # pycryptodome
 
@@ -56,6 +56,7 @@ def load_channels(path: str) -> list[tuple[str, bytes]]:
     except OSError:
         return channels
 
+    bad_lines: list[int] = []
     for lineno, raw in enumerate(lines, 1):
         line = raw.strip()
         if not line:
@@ -80,9 +81,15 @@ def load_channels(path: str) -> list[tuple[str, bytes]]:
             channels.append((line, _derive_hashtag_key(tag)))
             continue
 
-        warnings.warn(
-            f"channels file line {lineno}: unrecognised format, skipping: {line!r}",
-            stacklevel=2,
+        bad_lines.append(lineno)
+
+    if bad_lines:
+        line_list = ", ".join(str(n) for n in bad_lines)
+        print(
+            f"Warning: {path!r}: {len(bad_lines)} unrecognised line(s) skipped"
+            f" (lines {line_list}).\n"
+            f"  Expected format: 'Name [32hexchars]', '#hashtag', or '# comment'.",
+            file=sys.stderr,
         )
 
     return channels
