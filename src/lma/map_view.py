@@ -21,7 +21,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
 from lma.db import resolve_name
-from lma.decoder import decode_packet
+from lma.decoder import GROUP_TYPES, decode_packet
 
 try:
     from staticmap import CircleMarker, Line, StaticMap
@@ -77,12 +77,12 @@ def collect_map_nodes(
         path_coords: (lat, lon) pairs in routing order (source→relays→observer)
                      for drawing the path line
     """
-    dec = decode_packet(packet.get("raw_data", "") or "")
+    dec = packet.get("_decoded") or decode_packet(packet.get("raw_data", "") or "")
     payload_dec = dec.get("decoded") or {}
     ptype = dec.get("payload_type", "")
     route = dec.get("route_type") or packet.get("_route_type", "")
     is_direct = route in ("Direct", "TransportDirect")
-    is_group = ptype in ("GroupText", "GroupData")
+    is_group = ptype in GROUP_TYPES
     full_path = dec.get("path") or packet.get("_path") or []
 
     placed: list[tuple[str, str, float, float]] = []

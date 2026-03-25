@@ -67,6 +67,8 @@ PAYLOAD_NAMES = {
 
 DEVICE_ROLES = {0: "Unknown", 1: "ChatNode", 2: "Repeater", 3: "RoomServer", 4: "Sensor"}
 
+GROUP_TYPES: frozenset[str] = frozenset({"GroupText", "GroupData"})
+
 # ADVERT flags byte (offset 100)
 _ADVERT_HAS_LOCATION = 0x10  # bit 4
 _ADVERT_HAS_FEATURE1 = 0x20  # bit 5  (2-byte optional field, skip)

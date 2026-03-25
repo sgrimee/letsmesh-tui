@@ -19,46 +19,12 @@ from textual.worker import get_current_worker
 
 from lma.letsmesh_api import DEFAULT_REGION, fetch_packets
 from lma.db import is_input_node, learn_from_advert, load_db, resolve_name, save_db
-from lma.decoder import decode_packet
+from lma.decoder import GROUP_TYPES, decode_packet
 from lma.map_view import MapSidePanel, PacketMapScreen
 from lma.channels import build_channel_lookup, load_channels, try_decrypt
 
 MAX_PACKETS = 500
 
-
-def decode_path_from_raw(raw_data: str) -> list[str] | None:
-    """Decode path hops directly from raw MeshCore packet bytes.
-
-    Wire format (non-transport):
-      Byte 0:  header  (bits 0-1 = route_type)
-      Byte 1:  path_len  (bits 7-6 = hash_size-1, bits 5-0 = hop count)
-      Bytes 2+: hop data  (count × hash_size bytes)
-
-    Transport packets (route_type 0x00 or 0x03) have 4 extra bytes
-    (transport codes) before path_len, so path_len is at byte 5.
-
-    Returns list of hex strings (one per hop) or None on any parse error.
-    """
-    try:
-        raw = bytes.fromhex(raw_data)
-        if len(raw) < 2:
-            return None
-        route_type = raw[0] & 0x03
-        path_len_offset = 5 if route_type in (0x00, 0x03) else 1
-        if len(raw) <= path_len_offset:
-            return None
-        path_len_byte = raw[path_len_offset]
-        hash_size = (path_len_byte >> 6) + 1
-        count = path_len_byte & 0x3F
-        path_start = path_len_offset + 1
-        if len(raw) < path_start + count * hash_size:
-            return None
-        return [
-            raw[path_start + i * hash_size: path_start + (i + 1) * hash_size].hex()
-            for i in range(count)
-        ]
-    except Exception:
-        return None
 
 
 
@@ -75,7 +41,7 @@ def format_path(path_list: list, db: dict, resolve: int = 2,
            the last forwarder, not the original sender.
     """
     is_direct = route_type in ("Direct", "TransportDirect")
-    is_group = ptype in ("GroupText", "GroupData")
+    is_group = ptype in GROUP_TYPES
 
     def _fmt(display: str, node_id: str) -> str:
         return f"[yellow]{display}[/yellow]" if is_input_node(node_id, db) else display
@@ -145,7 +111,7 @@ def _fmt_hash(h: str, db: dict, hop_size: int = 1) -> str:
 
 def _build_detail_text(packet: dict, db: dict) -> str:
     p = packet
-    dec = decode_packet(p.get("raw_data", "") or "")
+    dec = p.get("_decoded") or decode_packet(p.get("raw_data", "") or "")
 
     observer_name = p.get("origin") or resolve_name(p.get("origin_id", ""), db)
     route = dec.get("route_type") or p.get("route_type", "-")
@@ -174,7 +140,7 @@ def _build_detail_text(packet: dict, db: dict) -> str:
     payload_dec = dec.get("decoded") or {}
 
     is_direct = route in ("Direct", "TransportDirect")
-    is_group = ptype in ("GroupText", "GroupData")
+    is_group = ptype in GROUP_TYPES
 
     # Authoritative source: payload src_hash (all encrypted types) or Advert public_key
     src_hash = payload_dec.get("src_hash", "") or p.get("_src_hash", "")
@@ -261,7 +227,7 @@ def _fmt_payload(ptype: str, d: dict, db: dict, packet: dict | None = None) -> l
         lines.append(f"[dim]MAC:[/dim]        {d.get('cipher_mac', '-')}")
         lines.append(f"[dim]Content:[/dim]    encrypted ({d.get('ciphertext_len', 0)} bytes)")
 
-    elif ptype in ("GroupText", "GroupData"):
+    elif ptype in GROUP_TYPES:
         decrypted = (packet or {}).get("_decrypted")
         if decrypted:
             lines.append(f"[dim]Channel:[/dim]    {markup_escape(decrypted['channel'])}")
@@ -562,9 +528,9 @@ class PacketMonitorApp(App):
         db_dirty = False
         for p in new:
             self._seen_ids.add(p["id"])
-            decoded = decode_path_from_raw(p.get("raw_data", ""))
-            p["_path"] = decoded if decoded is not None else (p.get("path") or [])
             pkt_dec = decode_packet(p.get("raw_data", "") or "")
+            p["_path"] = pkt_dec.get("path") or p.get("path") or []
+            p["_decoded"] = pkt_dec
             decoded_payload = pkt_dec.get("decoded") or {}
             p["_src_hash"] = decoded_payload.get("src_hash", "")
             p["_route_type"] = pkt_dec.get("route_type", "")
@@ -580,7 +546,7 @@ class PacketMonitorApp(App):
                     db_dirty = True
                 p["_src_hash"] = pub[:12]
             # For GroupText/GroupData, attempt decryption with configured channels
-            if (pkt_dec.get("payload_type") in ("GroupText", "GroupData")
+            if (pkt_dec.get("payload_type") in GROUP_TYPES
                     and self._channel_lookup):
                 raw_payload = bytes.fromhex(pkt_dec.get("payload_hex", "") or "")
                 if len(raw_payload) >= 3:

@@ -19,7 +19,7 @@ Decryption:
 from __future__ import annotations
 
 import hashlib
-import hmac as _hmac
+import hmac
 import re
 import struct
 import warnings
@@ -146,8 +146,8 @@ def _channel_hash_byte(key: bytes) -> int:
 
 def _verify_mac(ciphertext: bytes, key: bytes, expected: bytes) -> bool:
     """Check that HMAC-SHA256(ciphertext, key)[:2] == expected."""
-    mac = _hmac.new(key, ciphertext, hashlib.sha256).digest()[:2]
-    return _hmac.compare_digest(mac, expected)
+    mac = hmac.new(key, ciphertext, hashlib.sha256).digest()[:2]
+    return hmac.compare_digest(mac, expected)
 
 
 def _aes_ecb_decrypt(ciphertext: bytes, key: bytes) -> bytes | None:
