@@ -353,6 +353,14 @@ class MapSidePanel(Vertical):
         yield Container(id="map_side_body")
         yield Static("", id="map_side_footer", markup=True)
 
+    def clear(self) -> None:
+        """Clear the side panel content."""
+        self.query_one("#map_side_header", Static).update("")
+        self.query_one("#map_side_footer", Static).update("")
+        if self._map_widget is not None:
+            self._map_widget.remove()
+            self._map_widget = None
+
     def load_packet(self, packets: list[dict], index: int, db: dict) -> None:
         """Render the map for packets[index]."""
         p = packets[index]

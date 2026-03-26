@@ -754,6 +754,8 @@ class PacketMonitorApp(App):
         self._seen_ids = set()
         self._packets_by_id = {}
         self.query_one("#packets", DataTable).clear()
+        self.query_one("#detail_content", Static).update("")
+        self.query_one(MapSidePanel).clear()
         self._set_status(None)
 
     def _set_status(self, error: str | None) -> None:
