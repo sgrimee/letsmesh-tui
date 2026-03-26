@@ -557,6 +557,12 @@ class PacketMapScreen(ModalScreen):
         self._map_widget = w
         self.set_focus(None)
 
+    def key_escape(self) -> None:
+        self.dismiss()
+
+    def key_q(self) -> None:
+        self.dismiss()
+
     def action_prev(self) -> None:
         if self._index > 0:
             self._index -= 1

@@ -362,7 +362,7 @@ class PacketDetailScreen(ModalScreen):
         Binding("escape,q", "dismiss", "Close"),
         Binding("up,k", "prev", "Previous"),
         Binding("down,j", "next", "Next"),
-        Binding("shift+m", "open_map", "Map popup"),
+        Binding("M", "open_map", "Map popup"),
     ]
 
     def __init__(self, packets: list[dict], index: int, db: dict):
@@ -397,6 +397,12 @@ class PacketDetailScreen(ModalScreen):
             self._index += 1
             self._refresh_content()
 
+    def key_escape(self) -> None:
+        self.dismiss()
+
+    def key_q(self) -> None:
+        self.dismiss()
+
     def action_open_map(self) -> None:
         self.app.push_screen(PacketMapScreen(self._packets, self._index, self._db))
 
@@ -410,10 +416,10 @@ class PacketMonitorApp(App):
         Binding("r", "refresh", "Refresh"),
         Binding("p", "pause", "Pause/Resume"),
         Binding("f", "filter", "Filter"),
-        Binding("d", "toggle_detail_panel", "Detail"),
-        Binding("shift+d", "open_detail", "Detail popup"),
-        Binding("m", "toggle_map_panel", "Map"),
-        Binding("shift+m", "open_map", "Map popup"),
+        Binding("d", "toggle_detail_panel", "Detail", key_display="(Shift-)d"),
+        Binding("D", "open_detail", "Detail popup", show=False),
+        Binding("m", "toggle_map_panel", "Map", key_display="(Shift-)m"),
+        Binding("M", "open_map", "Map popup", show=False),
         Binding("a", "toggle_follow", "Follow"),
         Binding("l", "toggle_layout", "Layout"),
         Binding("n", "toggle_names", "Names"),
