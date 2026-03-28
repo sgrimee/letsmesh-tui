@@ -7,6 +7,10 @@ from unittest.mock import patch
 from meshcore_tools.db import learn_from_advert, load_db, parse_input_file, resolve_name, save_db, update
 
 
+class _StubCoordProvider:
+    def fetch_node_coords(self): return {}
+
+
 INPUT_CONTENT = """\
 sg-t1000-2                       CLI   6766f573d2ec  Flood
 1→Nils-echo                      CLI   5ab07f54cd13  Flood
@@ -84,10 +88,12 @@ def test_update_merge_partial_key(tmp_path):
 
     db_file = tmp_path / "nodes.json"
 
+    class _StubNodeProvider:
+        def fetch_nodes(self, region): return api_nodes
+
     with patch("meshcore_tools.db.INPUT_DIR", input_dir), \
-         patch("meshcore_tools.db.DB_FILE", db_file), \
-         patch("meshcore_tools.db.fetch_nodes", return_value=api_nodes):
-        update("LUX")
+         patch("meshcore_tools.db.DB_FILE", db_file):
+        update("LUX", node_provider=_StubNodeProvider(), coord_provider=_StubCoordProvider())
 
     db = json.loads(db_file.read_text())
     assert full_key in db["nodes"]
@@ -106,10 +112,12 @@ def test_update_api_failure_continues(tmp_path):
     (input_dir / "test.txt").write_text("my-node CLI aabbccdd\n")
     db_file = tmp_path / "nodes.json"
 
+    class _StubNodeProvider:
+        def fetch_nodes(self, region): raise Exception("network error")
+
     with patch("meshcore_tools.db.INPUT_DIR", input_dir), \
-         patch("meshcore_tools.db.DB_FILE", db_file), \
-         patch("meshcore_tools.db.fetch_nodes", side_effect=Exception("network error")):
-        update("LUX")
+         patch("meshcore_tools.db.DB_FILE", db_file):
+        update("LUX", node_provider=_StubNodeProvider(), coord_provider=_StubCoordProvider())
 
     db = json.loads(db_file.read_text())
     assert "aabbccdd" in db["nodes"]

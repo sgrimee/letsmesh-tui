@@ -1,11 +1,11 @@
-"""Tests for lma.letsmesh_api."""
+"""Tests for providers.letsmesh_rest."""
 
 import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from meshcore_tools.letsmesh_api import fetch_nodes, fetch_packets
+from meshcore_tools.providers.letsmesh_rest import LetsmeshRestProvider
 
 
 NODES_FIXTURE = {
@@ -33,10 +33,10 @@ def _mock_urlopen(fixture: dict | list):
     return resp
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_nodes_parses_role_map(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen(NODES_FIXTURE)
-    nodes = fetch_nodes("LUX")
+    nodes = LetsmeshRestProvider().fetch_nodes("LUX")
     key1 = "abcd1234" + "0" * 56
     key2 = "beef5678" + "0" * 56
     assert nodes[key1]["type"] == "REP"  # device_role 2
@@ -46,41 +46,41 @@ def test_fetch_nodes_parses_role_map(mock_urlopen):
     assert nodes[key1]["source"] == "api:LUX"
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_nodes_unknown_role(mock_urlopen):
     fixture = {"nodes": [{"public_key": "aa" * 32, "name": "x", "device_role": 99, "last_seen": ""}]}
     mock_urlopen.return_value = _mock_urlopen(fixture)
-    nodes = fetch_nodes("LUX")
+    nodes = LetsmeshRestProvider().fetch_nodes("LUX")
     assert nodes["aa" * 32]["type"] == "99"
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_packets_returns_list(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen(PACKETS_FIXTURE)
-    packets = fetch_packets("LUX", limit=10)
+    packets = LetsmeshRestProvider().fetch_packets("LUX", limit=10)
     assert len(packets) == 2
     assert packets[0]["id"] == "p1"
     assert packets[1]["payload_type"] == "POSITION"
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_packets_empty(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen({"packets": []})
-    packets = fetch_packets("LUX")
+    packets = LetsmeshRestProvider().fetch_packets("LUX")
     assert packets == []
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_packets_top_level_list(mock_urlopen):
     """API may return a bare list instead of {"packets": [...]}."""
     mock_urlopen.return_value = _mock_urlopen(PACKETS_FIXTURE["packets"])
-    packets = fetch_packets("LUX")
+    packets = LetsmeshRestProvider().fetch_packets("LUX")
     assert len(packets) == 2
     assert packets[0]["id"] == "p1"
 
 
-@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.providers.letsmesh_rest.urllib.request.urlopen")
 def test_fetch_nodes_propagates_error(mock_urlopen):
     mock_urlopen.side_effect = Exception("network error")
     with pytest.raises(Exception, match="network error"):
-        fetch_nodes("LUX")
+        LetsmeshRestProvider().fetch_nodes("LUX")

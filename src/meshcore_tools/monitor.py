@@ -17,7 +17,11 @@ from textual.containers import Container, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
-from meshcore_tools.letsmesh_api import DEFAULT_REGION, fetch_packets
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from meshcore_tools.providers import PacketProvider
+
 from meshcore_tools.db import is_input_node, learn_from_advert, load_db, resolve_name, save_db
 from meshcore_tools.decoder import GROUP_TYPES, decode_packet
 from meshcore_tools.map_view import MapSidePanel, PacketMapScreen
@@ -480,13 +484,15 @@ class PacketMonitorApp(App):
 
     def __init__(
         self,
-        region: str = DEFAULT_REGION,
+        region: str,
+        packet_provider: PacketProvider,
         poll_interval: int = 5,
         channels_path: str | None = None,
     ):
         super().__init__()
         self.region = region
         self.poll_interval = poll_interval
+        self._packet_provider = packet_provider
         channels = load_channels(channels_path) if channels_path else []
         self._channel_lookup = build_channel_lookup(channels)
         self._db: dict = {"nodes": {}}
@@ -528,7 +534,7 @@ class PacketMonitorApp(App):
         worker = get_current_worker()
         while not worker.is_cancelled:
             try:
-                packets = fetch_packets(self.region, limit=500)
+                packets = self._packet_provider.fetch_packets(self.region, limit=500)
                 self.call_from_thread(self._ingest_packets, packets)
             except Exception as e:
                 self.call_from_thread(self._set_status, str(e))
@@ -798,10 +804,14 @@ class PacketMonitorApp(App):
 
 
 def run_monitor(
-    region: str = DEFAULT_REGION,
+    region: str,
+    packet_provider: PacketProvider,
     poll_interval: int = 5,
     channels_path: str | None = None,
 ) -> None:
     PacketMonitorApp(
-        region=region, poll_interval=poll_interval, channels_path=channels_path
+        region=region,
+        packet_provider=packet_provider,
+        poll_interval=poll_interval,
+        channels_path=channels_path,
     ).run()
