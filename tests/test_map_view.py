@@ -2,7 +2,7 @@
 
 import struct
 
-from lma.map_view import _lookup_coords, collect_map_nodes
+from meshcore_tools.map_view import _lookup_coords, collect_map_nodes
 
 
 # ---------------------------------------------------------------------------

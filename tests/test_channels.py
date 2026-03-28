@@ -10,7 +10,7 @@ from pathlib import Path
 
 from Crypto.Cipher import AES
 
-from lma.channels import (
+from meshcore_tools.channels import (
     PUBLIC_CHANNEL_KEY,
     build_channel_lookup,
     load_channels,

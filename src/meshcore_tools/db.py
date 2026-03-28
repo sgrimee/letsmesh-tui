@@ -4,8 +4,8 @@ import json
 import re
 from pathlib import Path
 
-from lma.letsmesh_api import DEFAULT_REGION, fetch_nodes
-from lma.meshcore_api import fetch_node_coords
+from meshcore_tools.letsmesh_api import DEFAULT_REGION, fetch_nodes
+from meshcore_tools.meshcore_api import fetch_node_coords
 
 _ADVERT_ROLE_SHORT = {
     "ChatNode": "CLI", "Repeater": "REP", "RoomServer": "RMS", "Sensor": "CLT",

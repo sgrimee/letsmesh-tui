@@ -17,11 +17,11 @@ from textual.containers import Container, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, Input, Label, Static
 from textual.worker import get_current_worker
 
-from lma.letsmesh_api import DEFAULT_REGION, fetch_packets
-from lma.db import is_input_node, learn_from_advert, load_db, resolve_name, save_db
-from lma.decoder import GROUP_TYPES, decode_packet
-from lma.map_view import MapSidePanel, PacketMapScreen
-from lma.channels import build_channel_lookup, load_channels, try_decrypt
+from meshcore_tools.letsmesh_api import DEFAULT_REGION, fetch_packets
+from meshcore_tools.db import is_input_node, learn_from_advert, load_db, resolve_name, save_db
+from meshcore_tools.decoder import GROUP_TYPES, decode_packet
+from meshcore_tools.map_view import MapSidePanel, PacketMapScreen
+from meshcore_tools.channels import build_channel_lookup, load_channels, try_decrypt
 
 MAX_PACKETS = 500
 

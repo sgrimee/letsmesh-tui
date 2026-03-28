@@ -6,16 +6,16 @@ See README.md for usage, commands, input file format, and data sources.
 
 ## Architecture
 
-CLI entry point: `lma` (defined in `[project.scripts]` in `pyproject.toml`).
-Package: `src/lma/` with a `src/` layout. Tests in `tests/`.
+CLI entry point: `meshcore-tools` (defined in `[project.scripts]` in `pyproject.toml`).
+Package: `src/meshcore_tools/` with a `src/` layout. Tests in `tests/`.
 Dependency: `textual>=0.80` (TUI framework).
 
 **Module layout:**
-- `src/lma/cli.py` — entry point, argparse subcommands (`nodes`, `monitor`)
-- `src/lma/api.py` — letsmesh HTTP client (`fetch_nodes`, `fetch_packets`)
-- `src/lma/db.py` — node database (`load_db`, `save_db`, `parse_input_file`, `update`)
-- `src/lma/nodes.py` — node query/display (`lookup`, `list_nodes`)
-- `src/lma/monitor.py` — live Textual TUI (`PacketMonitorApp`, `run_monitor`)
+- `src/meshcore_tools/cli.py` — entry point, argparse subcommands (`nodes`, `monitor`)
+- `src/meshcore_tools/letsmesh_api.py` — letsmesh HTTP client (`fetch_nodes`, `fetch_packets`)
+- `src/meshcore_tools/db.py` — node database (`load_db`, `save_db`, `parse_input_file`, `update`)
+- `src/meshcore_tools/nodes.py` — node query/display (`lookup`, `list_nodes`)
+- `src/meshcore_tools/monitor.py` — live Textual TUI (`PacketMonitorApp`, `run_monitor`)
 
 **Data flow:** `input/*.txt` + live API → `nodes.json` (gitignored)
 

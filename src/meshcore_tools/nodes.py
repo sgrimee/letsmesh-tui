@@ -3,7 +3,7 @@
 import re
 import sys
 
-from lma.db import load_db
+from meshcore_tools.db import load_db
 
 
 def lookup(prefix: str) -> None:
@@ -29,7 +29,7 @@ def lookup(prefix: str) -> None:
 def list_nodes(by_key: bool = False) -> None:
     db = load_db()
     if not db["nodes"]:
-        print("No nodes in database. Run: lma nodes update")
+        print("No nodes in database. Run: meshcore-tools nodes update")
         return
     if by_key:
         items = sorted(db["nodes"].items(), key=lambda x: x[0])

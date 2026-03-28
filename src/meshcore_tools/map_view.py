@@ -1,7 +1,7 @@
 """Tile map view of nodes involved in a packet.
 
 Requires optional dependencies:
-    pip install "lma[map]"   # textual-image, staticmap, Pillow
+    pip install "meshcore-tools[map]"   # textual-image, staticmap, Pillow
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
-from lma.db import resolve_name
-from lma.decoder import GROUP_TYPES, decode_packet
+from meshcore_tools.db import resolve_name
+from meshcore_tools.decoder import GROUP_TYPES, decode_packet
 
 try:
     from staticmap import CircleMarker, Line, StaticMap
@@ -156,7 +156,7 @@ def collect_map_nodes(
 
 
 class _CachedStaticMap(StaticMap):
-    """StaticMap that caches downloaded tiles to ~/.cache/lma/tiles/."""
+    """StaticMap that caches downloaded tiles to ~/.cache/meshcore_tools/tiles/."""
 
     def get(self, url, **kwargs):
         _TILE_CACHE.mkdir(parents=True, exist_ok=True)
@@ -382,7 +382,7 @@ class MapSidePanel(Vertical):
 
         if not _HAS_MAP_LIBS:
             w = Static(
-                "[dim]Map requires: pip install 'lma[map]'[/dim]", markup=True
+                "[dim]Map requires: pip install 'meshcore-tools[map]'[/dim]", markup=True
             )
             map_body.mount(w)
             self._map_widget = w
@@ -436,7 +436,7 @@ class MapSidePanel(Vertical):
 class PacketMapScreen(ModalScreen):
     """OSM tile map view of nodes involved in a packet, with up/down navigation.
 
-    Requires optional dependencies: pip install 'lma[map]'
+    Requires optional dependencies: pip install 'meshcore-tools[map]'
     """
 
     DEFAULT_CSS = """
@@ -508,7 +508,7 @@ class PacketMapScreen(ModalScreen):
         if not _HAS_MAP_LIBS:
             w = Static(
                 "[dim]Map feature requires optional dependencies.[/dim]\n"
-                "Install with: [bold]pip install 'lma[map]'[/bold]",
+                "Install with: [bold]pip install 'meshcore-tools[map]'[/bold]",
                 markup=True,
             )
             map_body.mount(w)

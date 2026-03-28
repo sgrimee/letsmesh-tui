@@ -15,32 +15,32 @@ An unofficial CLI client for the [letsmesh analyzer](https://analyzer.letsmesh.n
 ## Usage
 
 ```
-lma nodes update [--region REGION]   update database from input files and APIs
-lma nodes lookup <hex_prefix>        find node(s) by key prefix (1+ hex chars)
-lma nodes list [--by-key]            list all nodes (default: sort by name)
-lma monitor [--region REGION] [--poll SECONDS] [--channels FILE]   live packet monitoring TUI
+meshcore-tools nodes update [--region REGION]   update database from input files and APIs
+meshcore-tools nodes lookup <hex_prefix>        find node(s) by key prefix (1+ hex chars)
+meshcore-tools nodes list [--by-key]            list all nodes (default: sort by name)
+meshcore-tools monitor [--region REGION] [--poll SECONDS] [--channels FILE]   live packet monitoring TUI
 ```
 
 ### Examples
 
 ```sh
 # Rebuild the database
-lma nodes update
+meshcore-tools nodes update
 
 # Look up by first byte of public key
-lma nodes lookup 7d
+meshcore-tools nodes lookup 7d
 
 # Look up by two bytes
-lma nodes lookup ab4b
+meshcore-tools nodes lookup ab4b
 
 # List all nodes sorted alphabetically
-lma nodes list
+meshcore-tools nodes list
 
 # List all nodes sorted by public key
-lma nodes list --by-key
+meshcore-tools nodes list --by-key
 
 # Start live packet monitor
-lma monitor
+meshcore-tools monitor
 ```
 
 ### Monitor keybindings
@@ -115,7 +115,7 @@ See `input/example.txt.sample` for a sample. Copy it to a new `.txt` file in the
 
 ### Live APIs
 
-On `lma nodes update`, the tool fetches data from two sources:
+On `meshcore-tools nodes update`, the tool fetches data from two sources:
 
 - **letsmesh** (`api.letsmesh.net`) — node list for the region; partial keys from input files are matched and upgraded to full 64-char keys. Use `--region` to select a region (default: `LUX`).
 - **map.meshcore.dev** — node coordinates (lat/lon); backfills any node in the database that lacks coordinates.
@@ -130,14 +130,14 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync --all-extras
-uv run lma nodes update
+uv run meshcore-tools nodes update
 ```
 
 Or install as a tool:
 
 ```sh
 uv tool install --all-extras .
-lma nodes update
+meshcore-tools nodes update
 ```
 
 ## Credits

@@ -2,7 +2,7 @@
 
 import struct
 
-from lma.decoder import decode_packet
+from meshcore_tools.decoder import decode_packet
 
 
 # ---------------------------------------------------------------------------

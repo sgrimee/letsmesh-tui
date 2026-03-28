@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lma.letsmesh_api import fetch_nodes, fetch_packets
+from meshcore_tools.letsmesh_api import fetch_nodes, fetch_packets
 
 
 NODES_FIXTURE = {
@@ -33,7 +33,7 @@ def _mock_urlopen(fixture: dict | list):
     return resp
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_nodes_parses_role_map(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen(NODES_FIXTURE)
     nodes = fetch_nodes("LUX")
@@ -46,7 +46,7 @@ def test_fetch_nodes_parses_role_map(mock_urlopen):
     assert nodes[key1]["source"] == "api:LUX"
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_nodes_unknown_role(mock_urlopen):
     fixture = {"nodes": [{"public_key": "aa" * 32, "name": "x", "device_role": 99, "last_seen": ""}]}
     mock_urlopen.return_value = _mock_urlopen(fixture)
@@ -54,7 +54,7 @@ def test_fetch_nodes_unknown_role(mock_urlopen):
     assert nodes["aa" * 32]["type"] == "99"
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_packets_returns_list(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen(PACKETS_FIXTURE)
     packets = fetch_packets("LUX", limit=10)
@@ -63,14 +63,14 @@ def test_fetch_packets_returns_list(mock_urlopen):
     assert packets[1]["payload_type"] == "POSITION"
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_packets_empty(mock_urlopen):
     mock_urlopen.return_value = _mock_urlopen({"packets": []})
     packets = fetch_packets("LUX")
     assert packets == []
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_packets_top_level_list(mock_urlopen):
     """API may return a bare list instead of {"packets": [...]}."""
     mock_urlopen.return_value = _mock_urlopen(PACKETS_FIXTURE["packets"])
@@ -79,7 +79,7 @@ def test_fetch_packets_top_level_list(mock_urlopen):
     assert packets[0]["id"] == "p1"
 
 
-@patch("lma.letsmesh_api.urllib.request.urlopen")
+@patch("meshcore_tools.letsmesh_api.urllib.request.urlopen")
 def test_fetch_nodes_propagates_error(mock_urlopen):
     mock_urlopen.side_effect = Exception("network error")
     with pytest.raises(Exception, match="network error"):

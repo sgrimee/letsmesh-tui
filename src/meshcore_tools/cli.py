@@ -1,14 +1,14 @@
-"""lma — letsmesh analyzer CLI entry point."""
+"""meshcore-tools — CLI entry point."""
 
 import argparse
 
-from lma.letsmesh_api import DEFAULT_REGION
+from meshcore_tools.letsmesh_api import DEFAULT_REGION
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="lma",
-        description="letsmesh analyzer — node database and live packet monitor",
+        prog="meshcore-tools",
+        description="meshcore tools — node database and live packet monitor",
     )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     sub.required = True
@@ -39,18 +39,18 @@ def main() -> None:
 
     if args.command == "nodes":
         if args.nodes_command == "update":
-            from lma.db import update
+            from meshcore_tools.db import update
             update(args.region)
         elif args.nodes_command == "lookup":
-            from lma.nodes import lookup
+            from meshcore_tools.nodes import lookup
             lookup(args.prefix)
         elif args.nodes_command == "list":
-            from lma.nodes import list_nodes
+            from meshcore_tools.nodes import list_nodes
             list_nodes(by_key=args.by_key)
 
     elif args.command == "monitor":
         import os
-        from lma.monitor import run_monitor
+        from meshcore_tools.monitor import run_monitor
         channels = args.channels
         if channels is None and os.path.exists("channels.txt"):
             channels = "channels.txt"

@@ -4,7 +4,7 @@ import json
 from unittest.mock import patch
 
 
-from lma.db import learn_from_advert, load_db, parse_input_file, resolve_name, save_db, update
+from meshcore_tools.db import learn_from_advert, load_db, parse_input_file, resolve_name, save_db, update
 
 
 INPUT_CONTENT = """\
@@ -51,7 +51,7 @@ def test_parse_input_file_source_is_filename(tmp_path):
 
 
 def test_load_db_missing_file(tmp_path):
-    with patch("lma.db.DB_FILE", tmp_path / "nodes.json"):
+    with patch("meshcore_tools.db.DB_FILE", tmp_path / "nodes.json"):
         db = load_db()
     assert db == {"nodes": {}}
 
@@ -59,7 +59,7 @@ def test_load_db_missing_file(tmp_path):
 def test_load_db_reads_existing(tmp_path):
     db_file = tmp_path / "nodes.json"
     db_file.write_text(json.dumps({"nodes": {"aabb": {"name": "x"}}}))
-    with patch("lma.db.DB_FILE", db_file):
+    with patch("meshcore_tools.db.DB_FILE", db_file):
         db = load_db()
     assert db["nodes"]["aabb"]["name"] == "x"
 
@@ -67,7 +67,7 @@ def test_load_db_reads_existing(tmp_path):
 def test_save_db_roundtrip(tmp_path):
     db_file = tmp_path / "nodes.json"
     db = {"nodes": {"aabb": {"name": "y", "type": "CLI"}}}
-    with patch("lma.db.DB_FILE", db_file):
+    with patch("meshcore_tools.db.DB_FILE", db_file):
         save_db(db)
         loaded = load_db()
     assert loaded == db
@@ -84,9 +84,9 @@ def test_update_merge_partial_key(tmp_path):
 
     db_file = tmp_path / "nodes.json"
 
-    with patch("lma.db.INPUT_DIR", input_dir), \
-         patch("lma.db.DB_FILE", db_file), \
-         patch("lma.db.fetch_nodes", return_value=api_nodes):
+    with patch("meshcore_tools.db.INPUT_DIR", input_dir), \
+         patch("meshcore_tools.db.DB_FILE", db_file), \
+         patch("meshcore_tools.db.fetch_nodes", return_value=api_nodes):
         update("LUX")
 
     db = json.loads(db_file.read_text())
@@ -106,9 +106,9 @@ def test_update_api_failure_continues(tmp_path):
     (input_dir / "test.txt").write_text("my-node CLI aabbccdd\n")
     db_file = tmp_path / "nodes.json"
 
-    with patch("lma.db.INPUT_DIR", input_dir), \
-         patch("lma.db.DB_FILE", db_file), \
-         patch("lma.db.fetch_nodes", side_effect=Exception("network error")):
+    with patch("meshcore_tools.db.INPUT_DIR", input_dir), \
+         patch("meshcore_tools.db.DB_FILE", db_file), \
+         patch("meshcore_tools.db.fetch_nodes", side_effect=Exception("network error")):
         update("LUX")
 
     db = json.loads(db_file.read_text())
