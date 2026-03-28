@@ -551,7 +551,7 @@ class PacketMonitorApp(App):
         for p in new:
             self._seen_ids.add(p["id"])
             pkt_dec = decode_packet(p.get("raw_data", "") or "")
-            p["_path"] = pkt_dec.get("path") or p.get("path") or []
+            p["_path"] = pkt_dec.get("path") or []
             p["_decoded"] = pkt_dec
             decoded_payload = pkt_dec.get("decoded") or {}
             p["_src_hash"] = decoded_payload.get("src_hash", "")
