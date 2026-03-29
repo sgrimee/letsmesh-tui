@@ -2,7 +2,7 @@
 
 import argparse
 
-from meshcore_tools.letsmesh_api import DEFAULT_REGION
+from meshcore_tools.providers.letsmesh_rest import DEFAULT_REGION
 
 
 def main() -> None:
@@ -40,7 +40,9 @@ def main() -> None:
     if args.command == "nodes":
         if args.nodes_command == "update":
             from meshcore_tools.db import update
-            update(args.region)
+            from meshcore_tools.providers.letsmesh_rest import LetsmeshRestProvider
+            from meshcore_tools.providers.meshcore_rest import MeshcoreRestProvider
+            update(args.region, node_provider=LetsmeshRestProvider(), coord_provider=MeshcoreRestProvider())
         elif args.nodes_command == "lookup":
             from meshcore_tools.nodes import lookup
             lookup(args.prefix)
@@ -54,7 +56,8 @@ def main() -> None:
         channels = args.channels
         if channels is None and os.path.exists("channels.txt"):
             channels = "channels.txt"
-        run_monitor(region=args.region, poll_interval=args.poll, channels_path=channels)
+        from meshcore_tools.providers.letsmesh_rest import LetsmeshRestProvider
+        run_monitor(region=args.region, poll_interval=args.poll, channels_path=channels, packet_provider=LetsmeshRestProvider())
 
 
 if __name__ == "__main__":

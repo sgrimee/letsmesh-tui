@@ -1,11 +1,14 @@
 """Node database: load, save, parse input files, and update from API."""
 
+from __future__ import annotations
+
 import json
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from meshcore_tools.letsmesh_api import DEFAULT_REGION, fetch_nodes
-from meshcore_tools.meshcore_api import fetch_node_coords
+if TYPE_CHECKING:
+    from meshcore_tools.providers import CoordProvider, NodeProvider
 
 _ADVERT_ROLE_SHORT = {
     "ChatNode": "CLI", "Repeater": "REP", "RoomServer": "RMS", "Sensor": "CLT",
@@ -121,7 +124,7 @@ def resolve_name(origin_id: str, db: dict) -> str:
     return "/".join(names) + "?"
 
 
-def update(region: str = DEFAULT_REGION) -> None:
+def update(region: str, node_provider: NodeProvider, coord_provider: CoordProvider) -> None:
     # Seed with advert-learned nodes so they survive if not in API/input files
     existing = load_db()
     advert_nodes = {k: v for k, v in existing["nodes"].items()
@@ -136,7 +139,7 @@ def update(region: str = DEFAULT_REGION) -> None:
 
     print(f"Fetching from API (region={region})...")
     try:
-        api_nodes = fetch_nodes(region)
+        api_nodes = node_provider.fetch_nodes(region)
         print(f"  {len(api_nodes)} nodes")
 
         partial_keys = {k: v for k, v in db["nodes"].items() if not v.get("key_complete")}
@@ -157,7 +160,7 @@ def update(region: str = DEFAULT_REGION) -> None:
 
     print("Fetching coordinates from map.meshcore.dev...")
     try:
-        coords = fetch_node_coords()
+        coords = coord_provider.fetch_node_coords()
         print(f"  {len(coords)} nodes with coordinates")
         filled = 0
         for key, node in db["nodes"].items():
